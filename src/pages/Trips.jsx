@@ -37,7 +37,7 @@ export default function Trips() {
     closeModal();
   };
 
-  const handleDelete = (id) => { if (confirm('Delete this trip?')) deleteItem('trips', id); };
+  const handleDelete = (id) => { deleteItem('trips', id); };
 
   const handleExport = () => exportToCSV(filtered, 'trips', [
     { label: 'Origin', accessor: r => r.origin }, { label: 'Destination', accessor: r => r.destination },

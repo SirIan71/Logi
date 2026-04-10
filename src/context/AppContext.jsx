@@ -35,7 +35,11 @@ export function AppProvider({ children }) {
 
   const addItem = useCallback((collection, item) => dispatch({ type: 'ADD_ITEM', collection, payload: item }), []);
   const updateItem = useCallback((collection, item) => dispatch({ type: 'UPDATE_ITEM', collection, payload: item }), []);
-  const deleteItem = useCallback((collection, id) => dispatch({ type: 'DELETE_ITEM', collection, payload: { id } }), []);
+  const deleteItem = useCallback((collection, id) => {
+    if (window.confirm('Are you sure you want to delete this record?')) {
+      dispatch({ type: 'DELETE_ITEM', collection, payload: { id } });
+    }
+  }, []);
 
   const lookup = useCallback((collection, id) => state[collection]?.find(i => i.id === id), [state]);
 
