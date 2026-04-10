@@ -1,26 +1,9 @@
 import { useMemo } from 'react';
 import { useApp } from '../context/AppContext';
-import { formatCurrency, formatNumber, getTripProfitability, daysUntil } from '../utils/helpers';
-import {
-  TrendingUp, TrendingDown, DollarSign, Receipt, BarChart3,
-  Truck, Package, Fuel, AlertTriangle, Users, MapPin
-} from 'lucide-react';
-import {
-  Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement,
-  LineElement, ArcElement, Filler, Tooltip, Legend
-} from 'chart.js';
-import { Bar, Line, Doughnut } from 'react-chartjs-2';
-
-ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Filler, Tooltip, Legend);
-
-const chartOpts = {
-  responsive: true, maintainAspectRatio: false,
-  plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1E293B', titleColor: '#F1F5F9', bodyColor: '#94A3B8', borderColor: '#334155', borderWidth: 1, padding: 10, cornerRadius: 8 } },
-  scales: { x: { grid: { color: '#1e293b44' }, ticks: { color: '#64748B', font: { size: 11 } } }, y: { grid: { color: '#1e293b44' }, ticks: { color: '#64748B', font: { size: 11 } } } }
-};
+import { formatCurrency, getTripProfitability } from '../utils/helpers';
 
 export default function Dashboard() {
-  const { trips, income, expenses, vehicles, clients, fuelRecords, maintenance, routes, lookup } = useApp();
+  const { trips, income, expenses, vehicles, clients, lookup } = useApp();
 
   const stats = useMemo(() => {
     const actualIncome = income.filter(i => i.payment_status === 'paid').reduce((s, i) => s + i.amount_paid, 0);
@@ -28,157 +11,284 @@ export default function Dashboard() {
     const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
     const outstanding = income.reduce((s, i) => s + (i.amount - i.amount_paid), 0);
     const redeemable = expenses.filter(e => e.is_redeemable && !e.is_redeemed).reduce((s, e) => s + e.amount, 0);
-    const activeTrips = trips.filter(t => t.status === 'in_progress').length;
-    const completedTrips = trips.filter(t => t.status === 'completed').length;
+    const completedTrips = trips.filter(t => t.status === 'completed').slice(0, 4);
     const fleetActive = vehicles.filter(v => v.status === 'active').length;
-    const dueMaintenance = maintenance.filter(m => daysUntil(m.next_due_date) <= 30).length;
-    return { actualIncome, projectedIncome, totalExpenses, netProfit: actualIncome - totalExpenses, outstanding, redeemable, activeTrips, completedTrips, fleetActive, dueMaintenance };
-  }, [trips, income, expenses, vehicles, maintenance]);
+    return { actualIncome, projectedIncome, totalExpenses, netProfit: actualIncome - totalExpenses, outstanding, redeemable, completedTrips, fleetActive };
+  }, [trips, income, expenses, vehicles]);
 
-  // Trip profitability data
-  const tripProfitData = useMemo(() => {
-    const completed = trips.filter(t => t.status === 'completed').slice(0, 8);
-    return {
-      labels: completed.map(t => `${t.origin.slice(0,3)}→${t.destination.slice(0,3)}`),
-      datasets: [
-        { label: 'Income', data: completed.map(t => getTripProfitability(t, income, expenses).income), backgroundColor: '#10B981', borderRadius: 6 },
-        { label: 'Expenses', data: completed.map(t => getTripProfitability(t, income, expenses).expenses), backgroundColor: '#EF4444', borderRadius: 6 },
-      ]
-    };
-  }, [trips, income, expenses]);
-
-  // Revenue trend (mock monthly data)
-  const revenueTrend = useMemo(() => ({
-    labels: ['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'],
-    datasets: [
-      { label: 'Revenue', data: [320000, 380000, 410000, 365000, 425000, stats.actualIncome || 271000], borderColor: '#3B82F6', backgroundColor: '#3b82f622', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#3B82F6' },
-      { label: 'Expenses', data: [210000, 240000, 195000, 230000, 265000, stats.totalExpenses || 165750], borderColor: '#EF4444', backgroundColor: '#ef444422', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#EF4444' },
-    ]
-  }), [stats]);
-
-  // Client revenue distribution
-  const clientRevenue = useMemo(() => {
+  // Client revenue dynamic
+  const topClients = useMemo(() => {
     const data = {};
     income.forEach(i => {
       const c = lookup('clients', i.client_id);
       const name = c?.company_name || 'Unknown';
       data[name] = (data[name] || 0) + i.amount;
     });
-    const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]);
-    return {
-      labels: sorted.map(s => s[0]),
-      datasets: [{ data: sorted.map(s => s[1]), backgroundColor: ['#3B82F6','#10B981','#F59E0B','#8B5CF6','#EF4444','#06B6D4'] }]
-    };
+    const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    const total = sorted.reduce((sum, item) => sum + item[1], 0) || 1;
+    return sorted.map(([name, amount], idx) => {
+       const colors = ['bg-primary', 'bg-secondary', 'bg-primary-container'];
+       return { name, percent: Math.round((amount / total) * 100), color: colors[idx] };
+    });
   }, [income, lookup]);
 
-  // Fuel by vehicle
-  const fuelByVehicle = useMemo(() => {
-    const data = {};
-    fuelRecords.forEach(f => {
-      const v = lookup('vehicles', f.vehicle_id);
-      const reg = v?.registration || f.vehicle_id;
-      data[reg] = (data[reg] || 0) + f.cost;
-    });
-    const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
-    return {
-      labels: entries.map(e => e[0]),
-      datasets: [{ label: 'Fuel Cost', data: entries.map(e => e[1]), backgroundColor: '#F59E0B', borderRadius: 6 }]
-    };
-  }, [fuelRecords, lookup]);
+  // Revenue vs Expenses Trend
+  const revenueTrend = useMemo(() => {
+    const monthlyData = {};
+    const now = new Date('2026-04-15'); // Reference against system seed data date center
+    
+    // Pre-fill last 6 months
+    for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        const monthStr = d.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+        monthlyData[key] = { month: monthStr, rev: 0, exp: 0 };
+    }
 
-  // Alerts
-  const alerts = useMemo(() => {
-    const list = [];
-    maintenance.forEach(m => {
-      const days = daysUntil(m.next_due_date);
-      const v = lookup('vehicles', m.vehicle_id);
-      if (days < 0) list.push({ type: 'danger', text: `${v?.registration} — ${m.service_type} overdue by ${Math.abs(days)} days`, time: m.next_due_date });
-      else if (days <= 30) list.push({ type: 'warning', text: `${v?.registration} — ${m.service_type} due in ${days} days`, time: m.next_due_date });
+    income.forEach(i => {
+       const dateStr = i.payment_date || i.due_date;
+       if (!dateStr) return;
+       const d = new Date(dateStr);
+       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+       if (monthlyData[key]) monthlyData[key].rev += i.amount;
     });
-    income.filter(i => i.payment_status === 'unpaid').forEach(i => {
-      const c = lookup('clients', i.client_id);
-      list.push({ type: 'danger', text: `${i.invoice_number} — ${formatCurrency(i.amount)} unpaid from ${c?.company_name}`, time: i.due_date });
-    });
-    trips.filter(t => t.status === 'delayed').forEach(t => {
-      list.push({ type: 'warning', text: `Trip ${t.origin}→${t.destination} is delayed`, time: t.departure_date });
-    });
-    return list.slice(0, 8);
-  }, [maintenance, income, trips, lookup]);
 
-  const kpis = [
-    { label: 'Projected Income', value: formatCurrency(stats.projectedIncome), icon: TrendingUp, color: 'var(--color-info)', bg: 'var(--color-info-bg)', trend: '+12%', up: true },
-    { label: 'Actual Income', value: formatCurrency(stats.actualIncome), icon: DollarSign, color: 'var(--color-success)', bg: 'var(--color-success-bg)', trend: '+8%', up: true },
-    { label: 'Total Expenses', value: formatCurrency(stats.totalExpenses), icon: Receipt, color: 'var(--color-danger)', bg: 'var(--color-danger-bg)', trend: '+5%', up: false },
-    { label: 'Net Profit', value: formatCurrency(stats.netProfit), icon: BarChart3, color: stats.netProfit >= 0 ? 'var(--color-success)' : 'var(--color-danger)', bg: stats.netProfit >= 0 ? 'var(--color-success-bg)' : 'var(--color-danger-bg)', trend: '+15%', up: true },
-    { label: 'Outstanding', value: formatCurrency(stats.outstanding), icon: AlertTriangle, color: 'var(--color-warning)', bg: 'var(--color-warning-bg)' },
-    { label: 'Redeemable', value: formatCurrency(stats.redeemable), icon: Receipt, color: 'var(--color-purple)', bg: 'var(--color-purple-bg)' },
-    { label: 'Active Trips', value: stats.activeTrips, icon: Package, color: 'var(--color-info)', bg: 'var(--color-info-bg)' },
-    { label: 'Fleet Active', value: `${stats.fleetActive}/${vehicles.length}`, icon: Truck, color: 'var(--color-success)', bg: 'var(--color-success-bg)' },
-  ];
+    expenses.forEach(e => {
+       const dateStr = e.expense_date;
+       if (!dateStr) return;
+       const d = new Date(dateStr);
+       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+       if (monthlyData[key]) monthlyData[key].exp += e.amount;
+    });
+
+    const dataArray = Object.values(monthlyData);
+    const maxVal = Math.max(...dataArray.flatMap(v => [v.rev, v.exp]), 1000);
+
+    return dataArray.map(item => ({
+        month: item.month,
+        rLevel: `${Math.max(5, Math.round((item.rev / maxVal) * 100))}%`,
+        eLevel: `${Math.max(5, Math.round((item.exp / maxVal) * 100))}%`,
+        rev: item.rev,
+        exp: item.exp
+    }));
+  }, [income, expenses]);
 
   return (
-    <div>
-      <div className="kpi-grid">
-        {kpis.map((kpi, i) => (
-          <div key={i} className="kpi-card" style={{ '--kpi-color': kpi.color, '--kpi-bg': kpi.bg }}>
-            <div className="kpi-header">
-              <div className="kpi-icon"><kpi.icon size={20}/></div>
-              {kpi.trend && (
-                <div className={`kpi-trend ${kpi.up ? 'up' : 'down'}`}>
-                  {kpi.up ? <TrendingUp size={12}/> : <TrendingDown size={12}/>} {kpi.trend}
-                </div>
-              )}
+    <>
+      <div className="flex justify-between items-end">
+        <div>
+          <h2 className="text-3xl font-headline font-extrabold text-primary">Logistics Overview</h2>
+          <p className="text-on-surface-variant font-body">Performance tracking for the current operational cycle.</p>
+        </div>
+        <button className="flex items-center gap-2 bg-gradient-to-br from-primary to-primary-container text-white px-6 py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition-all active:scale-95">
+          <span className="material-symbols-outlined">add</span>
+          New Shipment
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-surface-container-lowest p-6 rounded-xl shadow-sm border border-transparent hover:border-outline-variant/20 transition-all">
+          <div className="flex justify-between items-start mb-4">
+            <div className="p-2 bg-primary/5 rounded-lg">
+              <span className="material-symbols-outlined text-primary">trending_up</span>
             </div>
-            <div className="kpi-value">{kpi.value}</div>
-            <div className="kpi-label">{kpi.label}</div>
+            <span className="text-xs font-bold text-secondary bg-secondary-container px-2 py-1 rounded-full">+12%</span>
           </div>
-        ))}
+          <p className="text-sm text-on-surface-variant font-medium">Projected Income</p>
+          <h3 className="text-2xl font-headline font-extrabold text-primary mt-1">{formatCurrency(stats.projectedIncome)}</h3>
+        </div>
+
+        <div className="bg-surface-container-lowest p-6 rounded-xl shadow-sm border border-transparent hover:border-outline-variant/20 transition-all">
+          <div className="flex justify-between items-start mb-4">
+            <div className="p-2 bg-primary/5 rounded-lg">
+              <span className="material-symbols-outlined text-primary">account_balance_wallet</span>
+            </div>
+            <span className="text-xs font-bold text-secondary bg-secondary-container px-2 py-1 rounded-full">+8%</span>
+          </div>
+          <p className="text-sm text-on-surface-variant font-medium">Actual Income</p>
+          <h3 className="text-2xl font-headline font-extrabold text-primary mt-1">{formatCurrency(stats.actualIncome)}</h3>
+        </div>
+
+        <div className="bg-surface-container-lowest p-6 rounded-xl shadow-sm border border-transparent hover:border-outline-variant/20 transition-all">
+          <div className="flex justify-between items-start mb-4">
+            <div className="p-2 bg-error/5 rounded-lg">
+              <span className="material-symbols-outlined text-error">receipt_long</span>
+            </div>
+            <span className="text-xs font-bold text-error bg-error-container px-2 py-1 rounded-full">+5%</span>
+          </div>
+          <p className="text-sm text-on-surface-variant font-medium">Total Expenses</p>
+          <h3 className="text-2xl font-headline font-extrabold text-primary mt-1">{formatCurrency(stats.totalExpenses)}</h3>
+        </div>
+
+        <div className="bg-primary p-6 rounded-xl shadow-md relative overflow-hidden">
+          <div className="relative z-10">
+            <div className="flex justify-between items-start mb-4">
+              <div className="p-2 bg-white/10 rounded-lg">
+                <span className="material-symbols-outlined text-secondary-fixed">insights</span>
+              </div>
+              <span className="text-xs font-bold text-primary bg-secondary-fixed px-2 py-1 rounded-full">{stats.netProfit >= 0 ? '+' : '-'}15%</span>
+            </div>
+            <p className="text-sm text-white/70 font-medium">Net Profit</p>
+            <h3 className="text-2xl font-headline font-extrabold text-white mt-1">{formatCurrency(stats.netProfit)}</h3>
+          </div>
+          <div className="absolute -right-4 -bottom-4 opacity-10">
+            <span className="material-symbols-outlined text-[120px]">monitoring</span>
+          </div>
+        </div>
       </div>
 
-      <div className="charts-grid">
-        <div className="chart-card">
-          <div className="chart-card-header"><span className="chart-card-title">Revenue vs Expenses</span></div>
-          <div style={{height:280}}><Line data={revenueTrend} options={{...chartOpts, plugins: {...chartOpts.plugins, legend: {display:true, labels:{color:'#94A3B8',usePointStyle:true,pointStyle:'circle',padding:16,font:{size:11}}}}}} /></div>
-        </div>
-        <div className="chart-card">
-          <div className="chart-card-header"><span className="chart-card-title">Trip Profitability</span></div>
-          <div style={{height:280}}><Bar data={tripProfitData} options={{...chartOpts, plugins: {...chartOpts.plugins, legend: {display:true, labels:{color:'#94A3B8',usePointStyle:true,pointStyle:'circle',padding:16,font:{size:11}}}}}} /></div>
-        </div>
-        <div className="chart-card">
-          <div className="chart-card-header"><span className="chart-card-title">Client Revenue</span></div>
-          <div style={{height:280, display:'flex', justifyContent:'center'}}><Doughnut data={clientRevenue} options={{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'right',labels:{color:'#94A3B8',usePointStyle:true,pointStyle:'circle',padding:12,font:{size:11}}},tooltip:chartOpts.plugins.tooltip}, cutout:'65%'}} /></div>
-        </div>
-        <div className="chart-card">
-          <div className="chart-card-header"><span className="chart-card-title">Fuel Cost by Vehicle</span></div>
-          <div style={{height:280}}><Bar data={fuelByVehicle} options={chartOpts} /></div>
-        </div>
-      </div>
-
-      <div className="charts-grid">
-        <div className="alerts-panel">
-          <div className="alerts-panel-title">⚡ Alerts & Notifications</div>
-          {alerts.length === 0 ? <p style={{color:'var(--text-muted)',fontSize:13}}>No alerts at this time</p> : alerts.map((a, i) => (
-            <div key={i} className="alert-item">
-              <div className={`alert-dot ${a.type}`}/>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-1 space-y-6">
+          <div className="bg-surface-container-low p-6 rounded-xl">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center">
+                <span className="material-symbols-outlined text-primary">pending_actions</span>
+              </div>
               <div>
-                <div className="alert-text">{a.text}</div>
-                <div className="alert-time">{a.time}</div>
+                <p className="text-xs font-bold text-outline uppercase tracking-wider">Accounts Receivable</p>
+                <h4 className="text-xl font-headline font-bold text-primary">Outstanding</h4>
               </div>
             </div>
-          ))}
+            <div className="flex items-baseline gap-2">
+              <span className="text-4xl font-headline font-extrabold text-primary">{formatCurrency(stats.outstanding)}</span>
+            </div>
+          </div>
+          <div className="bg-surface-container-low p-6 rounded-xl">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center">
+                <span className="material-symbols-outlined text-secondary">stars</span>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-outline uppercase tracking-wider">Loyalty Credits</p>
+                <h4 className="text-xl font-headline font-bold text-primary">Redeemable</h4>
+              </div>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-4xl font-headline font-extrabold text-primary">{formatCurrency(stats.redeemable)}</span>
+            </div>
+          </div>
+          <div className="bg-secondary-fixed p-6 rounded-xl flex items-center justify-between">
+            <div>
+              <p className="text-on-secondary-fixed text-xs font-bold uppercase tracking-wider">Fleet Status</p>
+              <h4 className="text-on-secondary-fixed text-xl font-headline font-extrabold">{stats.fleetActive}/{vehicles.length} Active</h4>
+            </div>
+            <div className="w-14 h-14 bg-on-secondary-fixed/10 rounded-full flex items-center justify-center">
+              <span className="material-symbols-outlined text-on-secondary-fixed text-3xl">local_shipping</span>
+            </div>
+          </div>
         </div>
-        <div className="alerts-panel">
-          <div className="alerts-panel-title">📊 Quick Stats</div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px',marginTop:'8px'}}>
-            <div><div className="detail-label">Completed Trips</div><div className="detail-value" style={{fontSize:24,fontWeight:800}}>{stats.completedTrips}</div></div>
-            <div><div className="detail-label">Active Clients</div><div className="detail-value" style={{fontSize:24,fontWeight:800}}>{clients.filter(c=>c.status==='active').length}</div></div>
-            <div><div className="detail-label">Due Maintenance</div><div className="detail-value" style={{fontSize:24,fontWeight:800,color:'var(--color-warning)'}}>{stats.dueMaintenance}</div></div>
-            <div><div className="detail-label">Routes Managed</div><div className="detail-value" style={{fontSize:24,fontWeight:800}}>{routes.length}</div></div>
-            <div><div className="detail-label">Total Fuel Cost</div><div className="detail-value" style={{fontSize:18,fontWeight:700}}>{formatCurrency(fuelRecords.reduce((s,f)=>s+f.cost,0))}</div></div>
-            <div><div className="detail-label">Avg Trip Profit</div><div className="detail-value" style={{fontSize:18,fontWeight:700,color:'var(--color-success)'}}>{formatCurrency(trips.filter(t=>t.status==='completed').reduce((s,t)=>s+getTripProfitability(t,income,expenses).profit,0)/(stats.completedTrips||1))}</div></div>
+
+        <div className="lg:col-span-2 bg-surface-container-lowest p-8 rounded-xl shadow-sm">
+          <div className="flex justify-between items-center mb-8">
+            <div>
+              <h3 className="text-xl font-headline font-extrabold text-primary">Revenue vs Expenses</h3>
+              <p className="text-sm text-on-surface-variant">Performance analysis (Last 6 Months)</p>
+            </div>
+            <div className="flex gap-4">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-primary"></div>
+                <span className="text-xs font-medium text-outline">Revenue</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-error"></div>
+                <span className="text-xs font-medium text-outline">Expenses</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="h-64 flex items-end justify-between gap-4 relative">
+            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-5">
+              {[0,1,2,3].map(i => <div key={i} className="border-b border-on-surface w-full"></div>)}
+            </div>
+            
+            {revenueTrend.map(col => (
+               <div key={col.month} className="flex-1 flex flex-col items-center gap-2 group" title={`Revenue: ${formatCurrency(col.rev)} | Expenses: ${formatCurrency(col.exp)}`}>
+                 <div className="w-full flex justify-center items-end gap-1 h-full">
+                   <div className="w-4 bg-primary/20 rounded-t-sm transition-all" style={{height: col.eLevel}}></div>
+                   <div className="w-4 bg-primary rounded-t-sm transition-all group-hover:bg-primary-container" style={{height: col.rLevel}}></div>
+                 </div>
+                 <span className="text-[10px] font-bold text-outline">{col.month}</span>
+               </div>
+             ))}
           </div>
         </div>
       </div>
-    </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="bg-surface-container-lowest p-8 rounded-xl shadow-sm flex flex-col">
+          <h3 className="text-xl font-headline font-extrabold text-primary mb-6">Client Revenue</h3>
+          <div className="flex-1 flex flex-col items-center justify-center">
+            <div className="relative w-48 h-48 mb-8">
+              <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                <circle cx="18" cy="18" fill="transparent" r="15.9" stroke="#003539" strokeWidth="4" strokeDasharray="35 65"></circle>
+                <circle cx="18" cy="18" fill="transparent" r="15.9" stroke="#516600" strokeWidth="4" strokeDasharray="25 75" strokeDashoffset="-35"></circle>
+                <circle cx="18" cy="18" fill="transparent" r="15.9" stroke="#084D53" strokeWidth="4" strokeDasharray="20 80" strokeDashoffset="-60"></circle>
+                <circle cx="18" cy="18" fill="transparent" r="15.9" stroke="#BFC8C9" strokeWidth="4" strokeDasharray="20 80" strokeDashoffset="-80"></circle>
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-2xl font-extrabold font-headline text-primary">{clients.length}</span>
+                <span className="text-[10px] uppercase font-bold text-outline tracking-wider">Top Clients</span>
+              </div>
+            </div>
+            <div className="w-full space-y-3">
+              {topClients.map((tc, idx) => (
+                <div key={idx} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${tc.color}`}></div>
+                    <span className="text-xs font-medium text-on-surface-variant">{tc.name}</span>
+                  </div>
+                  <span className="text-xs font-bold text-primary">{tc.percent}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="lg:col-span-2 bg-surface-container-lowest p-8 rounded-xl shadow-sm overflow-hidden relative">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-xl font-headline font-extrabold text-primary">Trip Profitability</h3>
+            <div className="flex items-center gap-4">
+              <span className="text-xs font-bold text-secondary bg-secondary-container px-3 py-1 rounded-full">{stats.completedTrips.length} Recent</span>
+            </div>
+          </div>
+          
+          <div className="space-y-6">
+            {stats.completedTrips.map((t, idx) => {
+              const prof = getTripProfitability(t, income, expenses);
+              const percent = prof.income > 0 ? Math.round((prof.profit / prof.income) * 100) : 0;
+              const barColor = idx === 1 ? 'bg-secondary' : percent < 50 ? 'bg-primary/40' : 'bg-primary';
+              return (
+                <div key={idx}>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-xs font-bold text-primary uppercase">Route: {t.origin.slice(0,3)} → {t.destination.slice(0,3)}</span>
+                    <span className="text-xs font-bold text-primary">{formatCurrency(prof.profit)} ({percent}%)</span>
+                  </div>
+                  <div className="w-full bg-surface-container-high h-2.5 rounded-full overflow-hidden">
+                    <div className={`${barColor} h-full rounded-full transition-all duration-500`} style={{width: `${Math.max(percent, 0)}%`}}></div>
+                  </div>
+                </div>
+              );
+            })}
+            
+            {stats.completedTrips.length === 0 && (
+               <p className="text-sm text-outline">No recent completed trips found.</p>
+            )}
+          </div>
+          
+          <div className="mt-8 pt-6 border-t border-outline-variant/10 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center">
+                <span className="material-symbols-outlined text-primary">history</span>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-outline uppercase tracking-wider">Last Audit</p>
+                <p className="text-sm font-bold text-primary">{new Date().toLocaleString('en-US', {month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit', hour12: false})}</p>
+              </div>
+            </div>
+            <button className="text-primary text-xs font-bold underline decoration-secondary underline-offset-4">View All Reports</button>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }

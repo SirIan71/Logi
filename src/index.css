@@ -1,38 +1,42 @@
 /* SIRIAN Design System */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
-  --font-main: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  /* Dark Theme (default) */
-  --bg-body: #070B14;
-  --bg-sidebar: #0C1122;
-  --bg-card: #111827;
-  --bg-card-hover: #1a2234;
-  --bg-input: #1E293B;
-  --bg-modal: #111827;
-  --bg-table-header: #0f172a;
-  --bg-table-row-hover: #1a2234;
-  --border-color: #1E293B;
-  --border-subtle: #ffffff0a;
-  --text-primary: #F1F5F9;
-  --text-secondary: #94A3B8;
-  --text-muted: #64748B;
-  --text-inverse: #0F172A;
+  --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  /* Light Theme (Dashboard) */
+  --bg-body: theme('colors.surface');
+  --bg-sidebar: theme('colors.surface-container-low');
+  --bg-card: theme('colors.surface-container-lowest');
+  --bg-card-hover: theme('colors.surface-container-high');
+  --bg-input: theme('colors.surface-container-high');
+  --bg-modal: theme('colors.surface-container-lowest');
+  --bg-table-header: theme('colors.surface-container');
+  --bg-table-row-hover: theme('colors.surface-container-high');
+  --border-color: theme('colors.outline-variant');
+  --border-subtle: #181c1c15;
+  --text-primary: theme('colors.on-surface');
+  --text-secondary: theme('colors.on-surface-variant');
+  --text-muted: theme('colors.outline');
+  --text-inverse: theme('colors.on-primary');
   /* Accent colors */
-  --color-accent: #3B82F6;
-  --color-accent-hover: #2563EB;
-  --color-accent-glow: #3b82f633;
-  --color-success: #10B981;
-  --color-success-bg: #10b98118;
-  --color-warning: #F59E0B;
-  --color-warning-bg: #f59e0b18;
-  --color-danger: #EF4444;
-  --color-danger-bg: #ef444418;
-  --color-info: #06B6D4;
-  --color-info-bg: #06b6d418;
-  --color-muted: #64748B;
-  --color-purple: #8B5CF6;
-  --color-purple-bg: #8b5cf618;
+  --color-accent: theme('colors.primary');
+  --color-accent-hover: theme('colors.on-primary-fixed-variant');
+  --color-accent-glow: theme('colors.primary-fixed');
+  --color-success: theme('colors.secondary');
+  --color-success-bg: theme('colors.secondary-container');
+  --color-warning: #f59e0b;
+  --color-warning-bg: #fef3c7;
+  --color-danger: theme('colors.error');
+  --color-danger-bg: theme('colors.error-container');
+  --color-info: theme('colors.primary-fixed-dim');
+  --color-info-bg: theme('colors.primary-fixed');
+  --color-muted: theme('colors.outline');
+  --color-purple: theme('colors.tertiary');
+  --color-purple-bg: theme('colors.tertiary-container');
   /* Sizing */
   --sidebar-width: 260px;
   --sidebar-collapsed: 72px;
@@ -53,15 +57,18 @@
 html { font-size: 14px; scroll-behavior: smooth; }
 
 body {
-  font-family: var(--font-main);
-  background: var(--bg-body);
-  color: var(--text-primary);
-  line-height: 1.6;
+  font-family: 'Inter', sans-serif; 
+  background-color: theme('colors.surface');
+  color: theme('colors.on-surface');
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
 }
 
 #root { min-height: 100vh; }
+
+.font-headline { font-family: 'Plus Jakarta Sans', sans-serif; }
+.material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+.glass-sidebar { backdrop-filter: blur(24px); background-color: rgba(247, 250, 249, 0.9); }
 
 /* ═══ SCROLLBAR ═══ */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -452,7 +459,7 @@ body {
 /* ═══ LOGIN PAGE ═══ */
 .login-page {
   min-height: 100vh; display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(135deg, #070B14 0%, #0C1122 50%, #111827 100%);
+  background: var(--bg-body);
   position: relative; overflow: hidden;
 }
 .login-page::before {
@@ -476,15 +483,14 @@ body {
 }
 .login-logo .logo {
   width: 48px; height: 48px;
-  background: linear-gradient(135deg, var(--color-accent), #8B5CF6);
+  background: theme('colors.primary-container');
   border-radius: var(--radius-md);
   display: flex; align-items: center; justify-content: center;
-  font-weight: 900; font-size: 22px; color: white;
+  font-weight: 900; font-size: 22px; color: theme('colors.secondary-fixed');
 }
 .login-logo .brand {
   font-size: 28px; font-weight: 900;
-  background: linear-gradient(135deg, var(--color-accent), #8B5CF6);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  color: var(--color-accent);
   letter-spacing: 3px;
 }
 .login-subtitle {
@@ -497,8 +503,8 @@ body {
 .login-btn {
   width: 100%; padding: 12px; font-size: 15px; font-weight: 700;
   border-radius: var(--radius-md); border: none; cursor: pointer;
-  background: linear-gradient(135deg, var(--color-accent), #8B5CF6);
-  color: white; font-family: var(--font-main);
+  background: var(--color-accent);
+  color: var(--text-inverse); font-family: var(--font-main);
   transition: all var(--transition);
 }
 .login-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 20px var(--color-accent-glow); }

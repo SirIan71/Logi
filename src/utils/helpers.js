@@ -22,7 +22,7 @@ export const getStatusColor = (status) => {
   const map = {
     completed: 'var(--color-success)', paid: 'var(--color-success)', active: 'var(--color-success)', approved: 'var(--color-success)',
     in_progress: 'var(--color-info)', partially_paid: 'var(--color-warning)', pending: 'var(--color-warning)',
-    scheduled: 'var(--color-info)', maintenance: 'var(--color-warning)',
+    scheduled: '#0ea5e9', maintenance: '#fbbf24',
     unpaid: 'var(--color-danger)', delayed: 'var(--color-danger)', overdue: 'var(--color-danger)', rejected: 'var(--color-danger)',
     cancelled: 'var(--color-muted)', decommissioned: 'var(--color-muted)', inactive: 'var(--color-muted)',
   };

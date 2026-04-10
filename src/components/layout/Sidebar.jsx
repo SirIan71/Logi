@@ -1,91 +1,77 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import {
-  LayoutDashboard, Truck, MapPin, Package, Users, DollarSign,
-  Fuel, Receipt, FileText, Settings, ScrollText, Menu, LogOut, X
-} from 'lucide-react';
 
-const navItems = [
-  { label: 'Overview', items: [
-    { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  ]},
-  { label: 'Operations', items: [
-    { to: '/trips', icon: Package, label: 'Trips' },
-    { to: '/routes', icon: MapPin, label: 'Routes' },
-    { to: '/fleet', icon: Truck, label: 'Fleet' },
-    { to: '/clients', icon: Users, label: 'Clients' },
-  ]},
-  { label: 'Finance', items: [
-    { to: '/income', icon: DollarSign, label: 'Income' },
-    { to: '/fuel', icon: Fuel, label: 'Fuel' },
-    { to: '/expenses', icon: Receipt, label: 'Expenses' },
-  ]},
-  { label: 'System', items: [
-    { to: '/reports', icon: FileText, label: 'Reports' },
-    { to: '/audit-log', icon: ScrollText, label: 'Audit Log' },
-    { to: '/settings', icon: Settings, label: 'Settings' },
-  ]},
-];
-
-const roleAccess = {
-  admin: null, // all
-  finance: ['/','/income','/expenses','/fuel','/clients','/reports','/audit-log'],
-  operations: ['/','/trips','/routes','/fleet','/clients','/fuel','/expenses','/reports'],
-  driver: ['/','/trips','/fuel','/expenses'],
-};
-
-export default function Sidebar({ mobileOpen, onCloseMobile }) {
-  const { user, sidebarOpen, toggleSidebar, logout } = useApp();
-  const location = useLocation();
-  const allowed = roleAccess[user?.role];
-
+export default function Sidebar() {
+  const { logout } = useApp();
+  
   return (
-    <>
-      {mobileOpen && <div className="sidebar-overlay" onClick={onCloseMobile} style={{
-        position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:99
-      }}/>}
-      <aside className={`sidebar${sidebarOpen ? '' : ' collapsed'}${mobileOpen ? ' mobile-open' : ''}`}>
-        <div className="sidebar-brand">
-          <div className="logo">S</div>
-          <span className="brand-text">SIRIAN</span>
-          <button className="btn-icon" onClick={onCloseMobile} style={{marginLeft:'auto',display: mobileOpen ? 'flex' : 'none'}}>
-            <X size={18}/>
-          </button>
+    <aside className="h-screen w-64 fixed left-0 top-0 bg-slate-50 dark:bg-teal-950 flex flex-col p-6 space-y-4 z-40 border-r border-outline-variant/20">
+      <div className="flex items-center gap-3 mb-8 px-2">
+        <div className="w-10 h-10 bg-primary-container rounded-xl flex items-center justify-center">
+          <span className="material-symbols-outlined text-secondary-fixed">local_shipping</span>
         </div>
-        <nav className="sidebar-nav">
-          {navItems.map(section => {
-            const visibleItems = section.items.filter(i => !allowed || allowed.includes(i.to));
-            if (visibleItems.length === 0) return null;
-            return (
-              <div key={section.label}>
-                <div className="nav-section-label">{section.label}</div>
-                {visibleItems.map(item => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    className={({ isActive }) => `nav-item${isActive && location.pathname === item.to ? ' active' : ''}`}
-                    onClick={onCloseMobile}
-                    end={item.to === '/'}
-                  >
-                    <item.icon size={20}/>
-                    <span className="nav-label">{item.label}</span>
-                  </NavLink>
-                ))}
-              </div>
-            );
-          })}
-        </nav>
-        <div className="sidebar-footer">
-          <div className="user-avatar">{user?.name?.charAt(0) || 'U'}</div>
-          <div className="user-info">
-            <div className="user-name">{user?.name}</div>
-            <div className="user-role">{user?.role}</div>
-          </div>
-          <button className="btn-icon" onClick={logout} style={{marginLeft:'auto'}} title="Logout">
-            <LogOut size={18}/>
-          </button>
+        <div>
+          <h2 className="font-headline font-extrabold text-teal-900 dark:text-teal-50 leading-tight">Kinetic Cargo</h2>
+          <p className="text-[10px] uppercase tracking-widest text-teal-700/60 font-bold">Logistics OS</p>
         </div>
-      </aside>
-    </>
+      </div>
+      
+      <nav className="flex-1 space-y-1">
+        <div className="mb-4">
+          <p className="px-3 text-[10px] font-bold text-outline uppercase tracking-wider mb-2">Overview</p>
+          <NavLink to="/" end className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${isActive ? 'bg-lime-400 text-teal-950 font-bold scale-98' : 'text-teal-800 hover:bg-slate-200/50'}`}>
+            <span className="material-symbols-outlined">dashboard</span>
+            <span className="font-headline text-sm">Dashboard</span>
+          </NavLink>
+        </div>
+        
+        <div className="mb-4">
+          <p className="px-3 text-[10px] font-bold text-outline uppercase tracking-wider mb-2">Operations</p>
+          <NavLink to="/trips" className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${isActive ? 'bg-lime-400 text-teal-950 font-bold scale-98' : 'text-teal-800 hover:bg-slate-200/50'}`}>
+            <span className="material-symbols-outlined">route</span>
+            <span className="font-headline text-sm">Trips</span>
+          </NavLink>
+          <NavLink to="/routes" className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${isActive ? 'bg-lime-400 text-teal-950 font-bold scale-98' : 'text-teal-800 hover:bg-slate-200/50'}`}>
+            <span className="material-symbols-outlined">map</span>
+            <span className="font-headline text-sm">Routes</span>
+          </NavLink>
+          <NavLink to="/fleet" className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${isActive ? 'bg-lime-400 text-teal-950 font-bold scale-98' : 'text-teal-800 hover:bg-slate-200/50'}`}>
+            <span className="material-symbols-outlined">local_shipping</span>
+            <span className="font-headline text-sm">Fleet</span>
+          </NavLink>
+          <NavLink to="/clients" className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${isActive ? 'bg-lime-400 text-teal-950 font-bold scale-98' : 'text-teal-800 hover:bg-slate-200/50'}`}>
+            <span className="material-symbols-outlined">group</span>
+            <span className="font-headline text-sm">Clients</span>
+          </NavLink>
+        </div>
+        
+        <div className="mb-4">
+          <p className="px-3 text-[10px] font-bold text-outline uppercase tracking-wider mb-2">Finance</p>
+          <NavLink to="/income" className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${isActive ? 'bg-lime-400 text-teal-950 font-bold scale-98' : 'text-teal-800 hover:bg-slate-200/50'}`}>
+            <span className="material-symbols-outlined">payments</span>
+            <span className="font-headline text-sm">Income</span>
+          </NavLink>
+          <NavLink to="/fuel" className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${isActive ? 'bg-lime-400 text-teal-950 font-bold scale-98' : 'text-teal-800 hover:bg-slate-200/50'}`}>
+            <span className="material-symbols-outlined">gas_meter</span>
+            <span className="font-headline text-sm">Fuel</span>
+          </NavLink>
+          <NavLink to="/expenses" className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${isActive ? 'bg-lime-400 text-teal-950 font-bold scale-98' : 'text-teal-800 hover:bg-slate-200/50'}`}>
+            <span className="material-symbols-outlined">receipt_long</span>
+            <span className="font-headline text-sm">Expenses</span>
+          </NavLink>
+        </div>
+      </nav>
+      
+      <div className="pt-4 mt-auto space-y-1">
+        <NavLink to="/reports" className="flex items-center gap-3 px-3 py-2 text-teal-800 hover:bg-slate-200/50 rounded-xl transition-all">
+          <span className="material-symbols-outlined">help</span>
+          <span className="font-headline text-sm">Reports</span>
+        </NavLink>
+        <button onClick={logout} className="w-full flex items-center gap-3 px-3 py-2 text-teal-800 hover:bg-slate-200/50 rounded-xl transition-all">
+          <span className="material-symbols-outlined">logout</span>
+          <span className="font-headline text-sm">Sign Out</span>
+        </button>
+      </div>
+    </aside>
   );
 }
