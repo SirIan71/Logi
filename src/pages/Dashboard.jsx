@@ -27,8 +27,8 @@ export default function Dashboard() {
     const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]).slice(0, 3);
     const total = sorted.reduce((sum, item) => sum + item[1], 0) || 1;
     return sorted.map(([name, amount], idx) => {
-       const colors = ['bg-primary', 'bg-secondary', 'bg-primary-container'];
-       return { name, percent: Math.round((amount / total) * 100), color: colors[idx] };
+      const colors = ['bg-primary', 'bg-secondary', 'bg-primary-container'];
+      return { name, percent: Math.round((amount / total) * 100), color: colors[idx] };
     });
   }, [income, lookup]);
 
@@ -36,40 +36,40 @@ export default function Dashboard() {
   const revenueTrend = useMemo(() => {
     const monthlyData = {};
     const now = new Date('2026-04-15'); // Reference against system seed data date center
-    
+
     // Pre-fill last 6 months
     for (let i = 5; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        const monthStr = d.toLocaleString('en-US', { month: 'short' }).toUpperCase();
-        monthlyData[key] = { month: monthStr, rev: 0, exp: 0 };
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const monthStr = d.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+      monthlyData[key] = { month: monthStr, rev: 0, exp: 0 };
     }
 
     income.forEach(i => {
-       const dateStr = i.payment_date || i.due_date;
-       if (!dateStr) return;
-       const d = new Date(dateStr);
-       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-       if (monthlyData[key]) monthlyData[key].rev += i.amount;
+      const dateStr = i.payment_date || i.due_date;
+      if (!dateStr) return;
+      const d = new Date(dateStr);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (monthlyData[key]) monthlyData[key].rev += i.amount;
     });
 
     expenses.forEach(e => {
-       const dateStr = e.expense_date;
-       if (!dateStr) return;
-       const d = new Date(dateStr);
-       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-       if (monthlyData[key]) monthlyData[key].exp += e.amount;
+      const dateStr = e.expense_date;
+      if (!dateStr) return;
+      const d = new Date(dateStr);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (monthlyData[key]) monthlyData[key].exp += e.amount;
     });
 
     const dataArray = Object.values(monthlyData);
     const maxVal = Math.max(...dataArray.flatMap(v => [v.rev, v.exp]), 1000);
 
     return dataArray.map(item => ({
-        month: item.month,
-        rLevel: `${Math.max(5, Math.round((item.rev / maxVal) * 100))}%`,
-        eLevel: `${Math.max(5, Math.round((item.exp / maxVal) * 100))}%`,
-        rev: item.rev,
-        exp: item.exp
+      month: item.month,
+      rLevel: `${Math.max(5, Math.round((item.rev / maxVal) * 100))}%`,
+      eLevel: `${Math.max(5, Math.round((item.exp / maxVal) * 100))}%`,
+      rev: item.rev,
+      exp: item.exp
     }));
   }, [income, expenses]);
 
@@ -191,21 +191,21 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-          
+
           <div className="h-64 flex items-end justify-between gap-4 relative">
             <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-5">
-              {[0,1,2,3].map(i => <div key={i} className="border-b border-on-surface w-full"></div>)}
+              {[0, 1, 2, 3].map(i => <div key={i} className="border-b border-on-surface w-full"></div>)}
             </div>
-            
+
             {revenueTrend.map(col => (
-               <div key={col.month} className="flex-1 flex flex-col items-center gap-2 group" title={`Revenue: ${formatCurrency(col.rev)} | Expenses: ${formatCurrency(col.exp)}`}>
-                 <div className="w-full flex justify-center items-end gap-1 h-full">
-                   <div className="w-4 bg-primary/20 rounded-t-sm transition-all" style={{height: col.eLevel}}></div>
-                   <div className="w-4 bg-primary rounded-t-sm transition-all group-hover:bg-primary-container" style={{height: col.rLevel}}></div>
-                 </div>
-                 <span className="text-[10px] font-bold text-outline">{col.month}</span>
-               </div>
-             ))}
+              <div key={col.month} className="flex-1 flex flex-col items-center gap-2 group" title={`Revenue: ${formatCurrency(col.rev)} | Expenses: ${formatCurrency(col.exp)}`}>
+                <div className="w-full flex justify-center items-end gap-1 h-full">
+                  <div className="w-4 bg-primary/20 rounded-t-sm transition-all" style={{ height: col.eLevel }}></div>
+                  <div className="w-4 bg-primary rounded-t-sm transition-all group-hover:bg-primary-container" style={{ height: col.rLevel }}></div>
+                </div>
+                <span className="text-[10px] font-bold text-outline">{col.month}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -247,7 +247,7 @@ export default function Dashboard() {
               <span className="text-xs font-bold text-secondary bg-secondary-container px-3 py-1 rounded-full">{stats.completedTrips.length} Recent</span>
             </div>
           </div>
-          
+
           <div className="space-y-6">
             {stats.completedTrips.map((t, idx) => {
               const prof = getTripProfitability(t, income, expenses);
@@ -256,21 +256,21 @@ export default function Dashboard() {
               return (
                 <div key={idx}>
                   <div className="flex justify-between mb-2">
-                    <span className="text-xs font-bold text-primary uppercase">Route: {t.origin.slice(0,3)} → {t.destination.slice(0,3)}</span>
+                    <span className="text-xs font-bold text-primary uppercase">Route: {t.origin.slice(0, 3)} → {t.destination.slice(0, 3)}</span>
                     <span className="text-xs font-bold text-primary">{formatCurrency(prof.profit)} ({percent}%)</span>
                   </div>
                   <div className="w-full bg-surface-container-high h-2.5 rounded-full overflow-hidden">
-                    <div className={`${barColor} h-full rounded-full transition-all duration-500`} style={{width: `${Math.max(percent, 0)}%`}}></div>
+                    <div className={`${barColor} h-full rounded-full transition-all duration-500`} style={{ width: `${Math.max(percent, 0)}%` }}></div>
                   </div>
                 </div>
               );
             })}
-            
+
             {stats.completedTrips.length === 0 && (
-               <p className="text-sm text-outline">No recent completed trips found.</p>
+              <p className="text-sm text-outline">No recent completed trips found.</p>
             )}
           </div>
-          
+
           <div className="mt-8 pt-6 border-t border-outline-variant/10 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center">
@@ -278,7 +278,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="text-[10px] font-bold text-outline uppercase tracking-wider">Last Audit</p>
-                <p className="text-sm font-bold text-primary">{new Date().toLocaleString('en-US', {month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit', hour12: false})}</p>
+                <p className="text-sm font-bold text-primary">{new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}</p>
               </div>
             </div>
             <button className="text-primary text-xs font-bold underline decoration-secondary underline-offset-4">View All Reports</button>
