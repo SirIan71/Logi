@@ -43,7 +43,7 @@ export default function Trips() {
     { label: 'Origin', accessor: r => r.origin }, { label: 'Destination', accessor: r => r.destination },
     { label: 'Client', accessor: r => lookup('clients', r.client_id)?.company_name },
     { label: 'Vehicle', accessor: r => lookup('vehicles', r.vehicle_id)?.registration },
-    { label: 'Status', accessor: r => r.status }, { label: 'Departure', accessor: r => r.departure_date },
+    { label: 'Status', accessor: r => r.status }, { label: 'Departure', accessor: r => { if(!r.departure_date) return ''; const d = new Date(r.departure_date); return `=DATE(${d.getFullYear()},${d.getMonth()+1},${d.getDate()})`; } },
   ]);
 
   const formFields = (
@@ -66,7 +66,11 @@ export default function Trips() {
         </select>
       </div>
       <div className="form-group"><label className="form-label">Driver</label>
-        <select className="form-select" value={form.driver_id||''} onChange={e => setForm({...form, driver_id: e.target.value})}>
+        <select className="form-select" value={form.driver_id||''} onChange={e => {
+            const driver_id = e.target.value;
+            const veh = vehicles.find(v => v.assigned_driver_id === driver_id);
+            setForm({...form, driver_id, vehicle_id: veh ? veh.id : form.vehicle_id});
+        }}>
           <option value="">Select driver</option>{drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
       </div>

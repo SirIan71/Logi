@@ -15,11 +15,11 @@ const users = [
 ];
 
 const clients = [
-  { id: 'c1', company_name: 'Shoprite Holdings', contact_person: 'Maria van der Berg', email: 'maria@shoprite.co.za', phone: '+27 21 980 1234', address: '1 Shoprite Ln, Cape Town', payment_terms_days: 30, contract_type: 'Monthly', status: 'active' },
-  { id: 'c2', company_name: 'PPC Cement', contact_person: 'John Botha', email: 'john@ppc.co.za', phone: '+27 11 386 9000', address: '148 Katherine St, Sandton', payment_terms_days: 14, contract_type: 'Per Trip', status: 'active' },
-  { id: 'c3', company_name: 'Sasol Mining', contact_person: 'Nomsa Cele', email: 'nomsa@sasol.co.za', phone: '+27 17 614 2000', address: '1 Sturdee Ave, Rosebank', payment_terms_days: 30, contract_type: 'Contract', status: 'active' },
-  { id: 'c4', company_name: 'Tiger Brands', contact_person: 'Pieter Smit', email: 'pieter@tigerbrands.com', phone: '+27 11 840 4000', address: '3010 William Nicol, Bryanston', payment_terms_days: 21, contract_type: 'Monthly', status: 'active' },
-  { id: 'c5', company_name: 'Clover Industries', contact_person: 'Sarah Nkosi', email: 'sarah@clover.co.za', phone: '+27 11 987 6543', address: '200 Constantia Dr, Roodepoort', payment_terms_days: 30, contract_type: 'Per Trip', status: 'inactive' },
+  { id: 'c1', company_name: 'Shoprite Holdings', contact_person: 'Maria van der Berg', email: 'maria@shoprite.co.za', phone: '+27 21 980 1234', address: '1 Shoprite Ln, Cape Town', payment_terms_days: 30, contract_type: 'Monthly', status: 'active', rate_type: 'per_trip', rate_amount: 15000 },
+  { id: 'c2', company_name: 'PPC Cement', contact_person: 'John Botha', email: 'john@ppc.co.za', phone: '+27 11 386 9000', address: '148 Katherine St, Sandton', payment_terms_days: 14, contract_type: 'Per Trip', status: 'active', rate_type: 'per_ton', rate_amount: 800 },
+  { id: 'c3', company_name: 'Sasol Mining', contact_person: 'Nomsa Cele', email: 'nomsa@sasol.co.za', phone: '+27 17 614 2000', address: '1 Sturdee Ave, Rosebank', payment_terms_days: 30, contract_type: 'Contract', status: 'active', rate_type: 'per_ton', rate_amount: 950 },
+  { id: 'c4', company_name: 'Tiger Brands', contact_person: 'Pieter Smit', email: 'pieter@tigerbrands.com', phone: '+27 11 840 4000', address: '3010 William Nicol, Bryanston', payment_terms_days: 21, contract_type: 'Monthly', status: 'active', rate_type: 'per_trip', rate_amount: 12000 },
+  { id: 'c5', company_name: 'Clover Industries', contact_person: 'Sarah Nkosi', email: 'sarah@clover.co.za', phone: '+27 11 987 6543', address: '200 Constantia Dr, Roodepoort', payment_terms_days: 30, contract_type: 'Per Trip', status: 'inactive', rate_type: 'per_trip', rate_amount: 13500 },
 ];
 
 const vehicles = [
@@ -89,6 +89,7 @@ const expenseCategories = [
   { id: 'ec8', name: 'Licenses & Permits', default_redeemable: false, icon: 'FileText' },
   { id: 'ec9', name: 'Fines & Penalties', default_redeemable: false, icon: 'AlertTriangle' },
   { id: 'ec10', name: 'Miscellaneous', default_redeemable: false, icon: 'MoreHorizontal' },
+  { id: 'ec11', name: 'Car Wash', default_redeemable: false, icon: 'Droplets' },
 ];
 
 const expenses = [

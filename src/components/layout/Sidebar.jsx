@@ -39,6 +39,10 @@ export default function Sidebar() {
             <span className="material-symbols-outlined">local_shipping</span>
             <span className="font-headline text-sm">Fleet</span>
           </NavLink>
+          <NavLink to="/drivers" className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${isActive ? 'bg-lime-400 text-teal-950 font-bold scale-98' : 'text-teal-800 hover:bg-slate-200/50'}`}>
+            <span className="material-symbols-outlined">badge</span>
+            <span className="font-headline text-sm">Drivers</span>
+          </NavLink>
           <NavLink to="/clients" className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${isActive ? 'bg-lime-400 text-teal-950 font-bold scale-98' : 'text-teal-800 hover:bg-slate-200/50'}`}>
             <span className="material-symbols-outlined">group</span>
             <span className="font-headline text-sm">Clients</span>

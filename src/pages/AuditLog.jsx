@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
-import { formatDateTime, searchFilter } from '../utils/helpers';
-import { Search, Filter } from 'lucide-react';
+import { formatDateTime, searchFilter, exportToCSV } from '../utils/helpers';
+import { Search, Download } from 'lucide-react';
 
 export default function AuditLog() {
   const { auditLogs, lookup } = useApp();
@@ -19,7 +19,19 @@ export default function AuditLog() {
 
   return (
     <div>
-      <div className="page-header"><h1>Audit Log</h1></div>
+      <div className="page-header">
+        <h1>Audit Log</h1>
+        <div className="page-header-actions">
+          <button className="btn btn-secondary" onClick={() => exportToCSV(filtered, 'audit_logs', [
+            { label: 'Timestamp', accessor: r => formatDateTime(r.created_at) },
+            { label: 'User', accessor: r => lookup('users', r.user_id)?.name || 'System' },
+            { label: 'Action', accessor: r => r.action },
+            { label: 'Entity Type', accessor: r => r.entity_type },
+            { label: 'Entity ID', accessor: r => r.entity_id },
+            { label: 'Changes', accessor: r => r.new_values ? JSON.stringify(r.new_values) : '' }
+          ])}><Download size={16}/> Export CSV</button>
+        </div>
+      </div>
       <div className="table-container">
         <div className="table-toolbar">
           <div className="table-toolbar-left">

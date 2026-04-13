@@ -13,6 +13,7 @@ import Expenses from './pages/Expenses';
 import Reports from './pages/Reports';
 import AuditLog from './pages/AuditLog';
 import Settings from './pages/Settings';
+import Drivers from './pages/Drivers';
 
 function AppRoutes() {
   const { user } = useApp();
@@ -27,6 +28,7 @@ function AppRoutes() {
           <Route path="/trips" element={<Trips />} />
           <Route path="/routes" element={<RoutesPage />} />
           <Route path="/fleet" element={<Fleet />} />
+          <Route path="/drivers" element={<Drivers />} />
           <Route path="/clients" element={<Clients />} />
           <Route path="/income" element={<Income />} />
           <Route path="/fuel" element={<Fuel />} />

@@ -26,7 +26,7 @@ export default function Income() {
     outstanding: income.reduce((s, i) => s + (i.amount - i.amount_paid), 0),
   }), [income]);
 
-  const openAdd = () => { setForm({ payment_status: 'unpaid', amount: 0, amount_paid: 0 }); setModal('add'); };
+  const openAdd = () => { setForm({ payment_status: 'unpaid', amount: 0, amount_paid: 0, invoice_number: `INV-${new Date().getFullYear()}-${String(income.length + 1).padStart(3, '0')}` }); setModal('add'); };
   const openEdit = (item) => { setForm({ ...item }); setModal('edit'); };
   const closeModal = () => { setModal(null); setForm({}); };
 
@@ -75,7 +75,7 @@ export default function Income() {
         </div>
         <div style={{overflowX:'auto'}}>
           <table className="data-table">
-            <thead><tr><th>Invoice</th><th>Client</th><th>Trip</th><th>Amount</th><th>Paid</th><th>Outstanding</th><th>Status</th><th>Due Date</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Invoice</th><th>Client</th><th>Period / Trip</th><th>Expected Amount</th><th>Paid</th><th>Outstanding</th><th>Status</th><th>Due Date</th><th>Actions</th></tr></thead>
             <tbody>
               {filtered.length === 0 ? <tr><td colSpan={9} className="table-empty">No records found</td></tr> : filtered.map(i => {
                 const trip = lookup('trips', i.trip_id);
@@ -83,7 +83,7 @@ export default function Income() {
                   <tr key={i.id}>
                     <td className="primary">{i.invoice_number}</td>
                     <td>{lookup('clients', i.client_id)?.company_name || '—'}</td>
-                    <td>{trip ? `${trip.origin}→${trip.destination}` : '—'}</td>
+                    <td>{i.invoice_month ? new Date(i.invoice_month + '-01').toLocaleDateString('en-ZA', {month: 'short', year: 'numeric'}) : (trip ? `${trip.origin}→${trip.destination}` : '—')}</td>
                     <td className="numeric">{formatCurrency(i.amount)}</td>
                     <td className="numeric positive">{formatCurrency(i.amount_paid)}</td>
                     <td className="numeric negative">{formatCurrency(i.amount - i.amount_paid)}</td>
@@ -107,16 +107,34 @@ export default function Income() {
         <div className="form-grid">
           <div className="form-group"><label className="form-label">Invoice Number</label><input className="form-input" value={form.invoice_number||''} onChange={e=>setForm({...form,invoice_number:e.target.value})}/></div>
           <div className="form-group"><label className="form-label">Client</label>
-            <select className="form-select" value={form.client_id||''} onChange={e=>setForm({...form,client_id:e.target.value})}>
+            <select className="form-select" value={form.client_id||''} onChange={e=>{
+               const client_id = e.target.value;
+               let amount = form.amount || 0;
+               if (client_id && form.invoice_month) {
+                 const c = clients.find(cl=>cl.id===client_id);
+                 const clientTrips = trips.filter(t=>t.client_id===client_id && t.departure_date?.startsWith(form.invoice_month));
+                 if(c?.rate_type==='per_ton') amount = clientTrips.reduce((s,t)=>s + (t.cargo_weight_tons||0),0) * (c.rate_amount||0);
+                 else amount = clientTrips.length * (c.rate_amount||0);
+               }
+               setForm({...form, client_id, amount});
+            }}>
               <option value="">Select</option>{clients.map(c=><option key={c.id} value={c.id}>{c.company_name}</option>)}
             </select>
           </div>
-          <div className="form-group"><label className="form-label">Trip</label>
-            <select className="form-select" value={form.trip_id||''} onChange={e=>setForm({...form,trip_id:e.target.value})}>
-              <option value="">Select</option>{trips.map(t=><option key={t.id} value={t.id}>{t.origin}→{t.destination} ({formatDate(t.departure_date)})</option>)}
-            </select>
+          <div className="form-group"><label className="form-label">Invoice Month</label>
+            <input className="form-input" type="month" value={form.invoice_month||''} onChange={e=>{
+               const invoice_month = e.target.value;
+               let amount = form.amount || 0;
+               if (form.client_id && invoice_month) {
+                 const c = clients.find(cl=>cl.id===form.client_id);
+                 const clientTrips = trips.filter(t=>t.client_id===form.client_id && t.departure_date?.startsWith(invoice_month));
+                 if(c?.rate_type==='per_ton') amount = clientTrips.reduce((s,t)=>s + (t.cargo_weight_tons||0),0) * (c.rate_amount||0);
+                 else amount = clientTrips.length * (c.rate_amount||0);
+               }
+               setForm({...form, invoice_month, amount});
+            }}/>
           </div>
-          <div className="form-group"><label className="form-label">Amount</label><input className="form-input" type="number" value={form.amount||''} onChange={e=>setForm({...form,amount:e.target.value})}/></div>
+          <div className="form-group"><label className="form-label">Expected Amount</label><input className="form-input" type="number" value={form.amount||''} onChange={e=>setForm({...form,amount:e.target.value})}/></div>
           <div className="form-group"><label className="form-label">Amount Paid</label><input className="form-input" type="number" value={form.amount_paid||''} onChange={e=>setForm({...form,amount_paid:e.target.value})}/></div>
           <div className="form-group"><label className="form-label">Due Date</label><input className="form-input" type="date" value={form.due_date||''} onChange={e=>setForm({...form,due_date:e.target.value})}/></div>
           <div className="form-group full"><label className="form-label">Notes</label><textarea className="form-textarea" value={form.notes||''} onChange={e=>setForm({...form,notes:e.target.value})}/></div>

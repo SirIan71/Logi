@@ -146,7 +146,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="text-xs font-bold text-outline uppercase tracking-wider">Accounts Receivable</p>
-                <h4 className="text-xl font-headline font-bold text-primary">Outstanding</h4>
+                <h4 className="text-xl font-headline font-bold text-primary">Pending Income</h4>
               </div>
             </div>
             <div className="flex items-baseline gap-2">

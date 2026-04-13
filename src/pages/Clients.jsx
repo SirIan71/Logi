@@ -19,7 +19,9 @@ export default function Clients() {
     const totalPaid = ci.reduce((s, i) => s + i.amount_paid, 0);
     const outstanding = totalRevenue - totalPaid;
     const redeemable = expenses.filter(e => e.is_redeemable && e.trip_id && ct.some(t => t.id === e.trip_id)).reduce((s, e) => s + e.amount, 0);
-    return { ...c, tripCount: ct.length, totalRevenue, totalPaid, outstanding, redeemable, profit: totalRevenue - redeemable };
+    const rateTypeStr = c.rate_type === 'per_ton' ? 'Per Ton' : 'Per Trip';
+    const rateDisplay = c.rate_amount ? `${formatCurrency(c.rate_amount)} ${rateTypeStr}` : '—';
+    return { ...c, tripCount: ct.length, totalRevenue, totalPaid, outstanding, redeemable, profit: totalRevenue - redeemable, rateDisplay };
   }).sort((a, b) => b.totalRevenue - a.totalRevenue), [clients, trips, income, expenses]);
 
   const filtered = useMemo(() => searchFilter(clientStats, search, ['company_name', 'contact_person', 'email']), [clientStats, search]);
@@ -47,12 +49,13 @@ export default function Clients() {
         <div className="table-toolbar"><div className="table-toolbar-left"><div className="search-input"><Search size={15}/><input placeholder="Search clients..." value={search} onChange={e=>setSearch(e.target.value)}/></div></div></div>
         <div style={{overflowX:'auto'}}>
           <table className="data-table">
-            <thead><tr><th>Company</th><th>Contact</th><th>Phone</th><th>Trips</th><th>Revenue</th><th>Outstanding</th><th>Redeemable</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Company</th><th>Contact</th><th>Phone</th><th>Rate Card</th><th>Trips</th><th>Revenue</th><th>Outstanding</th><th>Redeemable</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody>{filtered.map(c => (
               <tr key={c.id}>
                 <td className="primary">{c.company_name}</td>
                 <td>{c.contact_person}</td>
                 <td>{c.phone}</td>
+                <td>{c.rateDisplay}</td>
                 <td className="numeric">{c.tripCount}</td>
                 <td className="numeric positive">{formatCurrency(c.totalRevenue)}</td>
                 <td className={`numeric ${c.outstanding>0?'negative':''}`}>{formatCurrency(c.outstanding)}</td>
@@ -82,6 +85,8 @@ export default function Clients() {
           <div><div className="detail-label">Outstanding</div><div className="detail-value" style={{color:'var(--color-danger)',fontSize:20,fontWeight:700}}>{formatCurrency(selected.outstanding)}</div></div>
           <div><div className="detail-label">Total Trips</div><div className="detail-value" style={{fontSize:20,fontWeight:700}}>{selected.tripCount}</div></div>
           <div><div className="detail-label">Redeemable Expenses</div><div className="detail-value" style={{color:'var(--color-purple)',fontSize:20,fontWeight:700}}>{formatCurrency(selected.redeemable)}</div></div>
+          <div><div className="detail-label">Rate Type</div><div className="detail-value">{selected.rate_type === 'per_ton' ? 'Per Ton' : 'Per Trip'}</div></div>
+          <div><div className="detail-label">Rate Amount</div><div className="detail-value">{formatCurrency(selected.rate_amount || 0)}</div></div>
         </div>
       </Modal>}
 
@@ -95,6 +100,8 @@ export default function Clients() {
           <div className="form-group full"><label className="form-label">Address</label><input className="form-input" value={form.address||''} onChange={e=>setForm({...form,address:e.target.value})}/></div>
           <div className="form-group"><label className="form-label">Payment Terms (days)</label><input className="form-input" type="number" value={form.payment_terms_days||''} onChange={e=>setForm({...form,payment_terms_days:+e.target.value})}/></div>
           <div className="form-group"><label className="form-label">Contract Type</label><select className="form-select" value={form.contract_type||''} onChange={e=>setForm({...form,contract_type:e.target.value})}><option value="Per Trip">Per Trip</option><option value="Monthly">Monthly</option><option value="Contract">Contract</option></select></div>
+          <div className="form-group"><label className="form-label">Rate Type</label><select className="form-select" value={form.rate_type||'per_trip'} onChange={e=>setForm({...form,rate_type:e.target.value})}><option value="per_trip">Per Trip</option><option value="per_ton">Per Ton</option></select></div>
+          <div className="form-group"><label className="form-label">Rate Amount</label><input className="form-input" type="number" value={form.rate_amount||''} onChange={e=>setForm({...form,rate_amount:+e.target.value})}/></div>
           <div className="form-group"><label className="form-label">Status</label><select className="form-select" value={form.status||'active'} onChange={e=>setForm({...form,status:e.target.value})}><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
         </div>
       </Modal>}

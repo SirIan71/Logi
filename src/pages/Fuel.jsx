@@ -70,7 +70,21 @@ export default function Fuel() {
   const openAdd = () => { setForm({ date: new Date().toISOString().split('T')[0] }); setModal('add'); };
   const openEdit = (f) => { setForm({ ...f }); setModal('edit'); };
   const closeModal = () => { setModal(null); setForm({}); };
-  const save = () => { const data = { ...form, liters: +form.liters, cost: +form.cost, odometer_reading: +form.odometer_reading }; if (modal === 'add') addItem('fuelRecords', { ...data, id: generateId('f') }); else updateItem('fuelRecords', data); closeModal(); };
+  const save = () => { 
+    const data = { ...form, liters: +form.liters, cost: +form.cost, odometer_reading: +form.odometer_reading }; 
+    if (modal === 'add') addItem('fuelRecords', { ...data, id: generateId('f') }); 
+    else updateItem('fuelRecords', data); 
+    
+    // Update vehicle odometer
+    if (data.vehicle_id && data.odometer_reading) {
+      const v = lookup('vehicles', data.vehicle_id);
+      if (v && data.odometer_reading > (v.current_odometer || 0)) {
+        updateItem('vehicles', { ...v, current_odometer: data.odometer_reading });
+      }
+    }
+    
+    closeModal(); 
+  };
 
   return (
     <div>
