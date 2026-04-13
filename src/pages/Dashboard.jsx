@@ -80,10 +80,6 @@ export default function Dashboard() {
           <h2 className="text-3xl font-headline font-extrabold text-primary">Logistics Overview</h2>
           <p className="text-on-surface-variant font-body">Performance tracking for the current operational cycle.</p>
         </div>
-        <button className="flex items-center gap-2 bg-gradient-to-br from-primary to-primary-container text-white px-6 py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition-all active:scale-95">
-          <span className="material-symbols-outlined">add</span>
-          New Shipment
-        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

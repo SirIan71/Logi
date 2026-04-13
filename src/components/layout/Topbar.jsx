@@ -30,11 +30,6 @@ export default function Topbar() {
   return (
     <header className="w-full sticky top-0 z-50 bg-surface/80 backdrop-blur-xl border-b border-outline-variant/10 flex justify-between items-center px-8 h-16">
       <div className="flex items-center gap-8">
-        <h1 className="font-headline text-xl font-bold tracking-tight text-primary">{title}</h1>
-        <div className="hidden md:flex bg-surface-container-high px-4 py-2 rounded-full items-center gap-2 w-80 border border-outline-variant/20 focus-within:border-primary/50 transition-colors">
-          <span className="material-symbols-outlined text-outline text-sm">search</span>
-          <input className="bg-transparent text-primary border-none focus:ring-0 text-sm w-full font-body outline-none" placeholder="Search shipments, routes, or fleet..." type="text" />
-        </div>
       </div>
       <div className="flex items-center gap-4 relative">
         <button onClick={() => setShowNotifications(!showNotifications)} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-highest flex-shrink-0 transition-colors active:scale-95 duration-150 relative">
