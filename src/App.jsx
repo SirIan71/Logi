@@ -14,6 +14,8 @@ import Reports from './pages/Reports';
 import AuditLog from './pages/AuditLog';
 import Settings from './pages/Settings';
 import Drivers from './pages/Drivers';
+import { SpeedInsights } from '@vercel/speed-insights/react';
+
 
 function AppRoutes() {
   const { user } = useApp();
@@ -47,6 +49,7 @@ export default function App() {
   return (
     <AppProvider>
       <AppRoutes />
+      <SpeedInsights />
     </AppProvider>
   );
 }
