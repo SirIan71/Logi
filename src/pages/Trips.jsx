@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
-import { formatCurrency, formatDate, searchFilter, generateId, getTripProfitability, exportToCSV } from '../utils/helpers';
+import { formatDate, searchFilter, generateId, exportToCSV } from '../utils/helpers';
 import StatusBadge from '../components/common/StatusBadge';
 import Modal from '../components/common/Modal';
 import { Plus, Search, Download, Eye, Edit2, Trash2 } from 'lucide-react';
@@ -8,7 +8,7 @@ import { Plus, Search, Download, Eye, Edit2, Trash2 } from 'lucide-react';
 const statuses = ['all', 'scheduled', 'in_progress', 'completed', 'delayed', 'cancelled'];
 
 export default function Trips() {
-  const { trips, routes, vehicles, clients, income, expenses, lookup, addItem, updateItem, deleteItem } = useApp();
+  const { trips, routes, vehicles, clients, lookup, addItem, updateItem, deleteItem } = useApp();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [modal, setModal] = useState(null); // 'add' | 'edit' | 'view' | null
@@ -60,18 +60,18 @@ export default function Trips() {
       </div>
       <div className="form-group"><label className="form-label">Origin</label><input className="form-input" value={form.origin||''} onChange={e => setForm({...form, origin: e.target.value})} /></div>
       <div className="form-group"><label className="form-label">Destination</label><input className="form-input" value={form.destination||''} onChange={e => setForm({...form, destination: e.target.value})} /></div>
-      <div className="form-group"><label className="form-label">Vehicle</label>
-        <select className="form-select" value={form.vehicle_id||''} onChange={e => setForm({...form, vehicle_id: e.target.value})}>
-          <option value="">Select vehicle</option>{vehicles.filter(v=>v.status==='active').map(v => <option key={v.id} value={v.id}>{v.registration} — {v.make} {v.model}</option>)}
-        </select>
-      </div>
       <div className="form-group"><label className="form-label">Driver</label>
         <select className="form-select" value={form.driver_id||''} onChange={e => {
             const driver_id = e.target.value;
             const veh = vehicles.find(v => v.assigned_driver_id === driver_id);
-            setForm({...form, driver_id, vehicle_id: veh ? veh.id : form.vehicle_id});
+            setForm({...form, driver_id, vehicle_id: veh ? veh.id : (form.vehicle_id || '')});
         }}>
           <option value="">Select driver</option>{drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+        </select>
+      </div>
+      <div className="form-group"><label className="form-label">Vehicle</label>
+        <select className="form-select" value={form.vehicle_id||''} onChange={e => setForm({...form, vehicle_id: e.target.value})} disabled={!!(form.driver_id && vehicles.find(v => v.assigned_driver_id === form.driver_id))}>
+          <option value="">Select vehicle</option>{vehicles.filter(v=>v.status==='active').map(v => <option key={v.id} value={v.id}>{v.registration} — {v.make} {v.model}</option>)}
         </select>
       </div>
       <div className="form-group"><label className="form-label">Cargo Type</label><input className="form-input" value={form.cargo_type||''} onChange={e => setForm({...form, cargo_type: e.target.value})} /></div>
@@ -114,11 +114,10 @@ export default function Trips() {
         <div style={{overflowX:'auto'}}>
           <table className="data-table">
             <thead><tr>
-              <th>Route</th><th>Client</th><th>Vehicle</th><th>Driver</th><th>Cargo</th><th>Departure</th><th>Status</th><th>Profit</th><th>Actions</th>
+              <th>Route</th><th>Client</th><th>Vehicle</th><th>Driver</th><th>Cargo</th><th>Departure</th><th>Status</th><th>Actions</th>
             </tr></thead>
             <tbody>
-              {filtered.length === 0 ? <tr><td colSpan={9} className="table-empty">No trips found</td></tr> : filtered.map(t => {
-                const prof = getTripProfitability(t, income, expenses);
+              {filtered.length === 0 ? <tr><td colSpan={8} className="table-empty">No trips found</td></tr> : filtered.map(t => {
                 return (
                   <tr key={t.id}>
                     <td className="primary">{t.origin} → {t.destination}</td>
@@ -128,9 +127,6 @@ export default function Trips() {
                     <td>{t.cargo_type}</td>
                     <td>{formatDate(t.departure_date)}</td>
                     <td><StatusBadge status={t.status} /></td>
-                    <td className={`numeric ${prof.isPaid ? (prof.profit >= 0 ? 'positive' : 'negative') : ''}`} style={{color: prof.isPaid ? undefined : 'var(--text-muted)'}}>
-                      {formatCurrency(prof.profit)}
-                    </td>
                     <td>
                       <div style={{display:'flex',gap:4}}>
                         <button className="btn-icon" onClick={() => openView(t)} title="View"><Eye size={16}/></button>
@@ -156,22 +152,17 @@ export default function Trips() {
 
       {modal === 'view' && selected && (
         <Modal title="Trip Details" onClose={closeModal}>
-          {(() => { const prof = getTripProfitability(selected, income, expenses); return (
-            <div className="detail-grid">
-              <div><div className="detail-label">Route</div><div className="detail-value">{selected.origin} → {selected.destination}</div></div>
-              <div><div className="detail-label">Status</div><div className="detail-value"><StatusBadge status={selected.status}/></div></div>
-              <div><div className="detail-label">Client</div><div className="detail-value">{lookup('clients', selected.client_id)?.company_name}</div></div>
-              <div><div className="detail-label">Vehicle</div><div className="detail-value">{lookup('vehicles', selected.vehicle_id)?.registration}</div></div>
-              <div><div className="detail-label">Driver</div><div className="detail-value">{lookup('users', selected.driver_id)?.name}</div></div>
-              <div><div className="detail-label">Cargo</div><div className="detail-value">{selected.cargo_type} — {selected.cargo_weight_tons}t</div></div>
-              <div><div className="detail-label">Departure</div><div className="detail-value">{formatDate(selected.departure_date)}</div></div>
-              <div><div className="detail-label">Arrival</div><div className="detail-value">{formatDate(selected.arrival_date)}</div></div>
-              <div><div className="detail-label">Distance</div><div className="detail-value">{selected.actual_distance_km || selected.estimated_distance_km} km</div></div>
-              <div><div className="detail-label">Income</div><div className="detail-value" style={{color:'var(--color-success)'}}>{formatCurrency(prof.income)}</div></div>
-              <div><div className="detail-label">Expenses</div><div className="detail-value" style={{color:'var(--color-danger)'}}>{formatCurrency(prof.expenses)}</div></div>
-              <div><div className="detail-label">Profit</div><div className="detail-value" style={{color: prof.isPaid ? (prof.profit>=0?'var(--color-success)':'var(--color-danger)') : 'var(--text-muted)', fontWeight:700, fontSize:18}}>{formatCurrency(prof.profit)}</div></div>
-            </div>
-          ); })()}
+          <div className="detail-grid">
+            <div><div className="detail-label">Route</div><div className="detail-value">{selected.origin} → {selected.destination}</div></div>
+            <div><div className="detail-label">Status</div><div className="detail-value"><StatusBadge status={selected.status}/></div></div>
+            <div><div className="detail-label">Client</div><div className="detail-value">{lookup('clients', selected.client_id)?.company_name}</div></div>
+            <div><div className="detail-label">Vehicle</div><div className="detail-value">{lookup('vehicles', selected.vehicle_id)?.registration}</div></div>
+            <div><div className="detail-label">Driver</div><div className="detail-value">{lookup('users', selected.driver_id)?.name}</div></div>
+            <div><div className="detail-label">Cargo</div><div className="detail-value">{selected.cargo_type} — {selected.cargo_weight_tons}t</div></div>
+            <div><div className="detail-label">Departure</div><div className="detail-value">{formatDate(selected.departure_date)}</div></div>
+            <div><div className="detail-label">Arrival</div><div className="detail-value">{formatDate(selected.arrival_date)}</div></div>
+            <div><div className="detail-label">Distance</div><div className="detail-value">{selected.actual_distance_km || selected.estimated_distance_km} km</div></div>
+          </div>
         </Modal>
       )}
     </div>

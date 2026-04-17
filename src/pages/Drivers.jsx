@@ -23,11 +23,31 @@ export default function Drivers() {
 
   const filtered = useMemo(() => searchFilter(driversStats, search, ['name', 'email', 'phone', 'assignedVehicle']), [driversStats, search]);
 
-  const openAdd = () => { setForm({ role: 'driver', is_active: true }); setModal('add'); };
-  const openEdit = (d) => { setForm({ ...d }); setModal('edit'); };
+  const openAdd = () => { setForm({ role: 'driver', is_active: true, assigned_vehicle_id: '' }); setModal('add'); };
+  const openEdit = (d) => { const v = vehicles.find(veh => veh.assigned_driver_id === d.id); setForm({ ...d, assigned_vehicle_id: v ? v.id : '' }); setModal('edit'); };
   const openView = (d) => { setSelected(d); setModal('view'); };
   const closeModal = () => { setModal(null); setSelected(null); setForm({}); };
-  const save = () => { if (modal === 'add') addItem('users', { ...form, id: generateId('d') }); else updateItem('users', form); closeModal(); };
+  const save = () => {
+    const driverId = modal === 'add' ? generateId('d') : form.id;
+    const { assigned_vehicle_id, ...driverObj } = form;
+    if (modal === 'add') addItem('users', { ...driverObj, id: driverId }); else updateItem('users', driverObj);
+    
+    // Clear currently assigned vehicle(s) for this driver
+    vehicles.forEach(v => {
+      if (v.assigned_driver_id === driverId && v.id !== assigned_vehicle_id) {
+        updateItem('vehicles', { ...v, assigned_driver_id: null });
+      }
+    });
+
+    // Assign new vehicle
+    if (assigned_vehicle_id) {
+      const v = vehicles.find(veh => veh.id === assigned_vehicle_id);
+      if (v && v.assigned_driver_id !== driverId) {
+        updateItem('vehicles', { ...v, assigned_driver_id: driverId });
+      }
+    }
+    closeModal();
+  };
 
   return (
     <div>
@@ -84,6 +104,12 @@ export default function Drivers() {
           <div className="form-group"><label className="form-label">Email</label><input className="form-input" type="email" value={form.email||''} onChange={e=>setForm({...form,email:e.target.value})}/></div>
           <div className="form-group"><label className="form-label">Phone</label><input className="form-input" value={form.phone||''} onChange={e=>setForm({...form,phone:e.target.value})}/></div>
           <div className="form-group"><label className="form-label">Status</label><select className="form-select" value={form.is_active ? 'active' : 'inactive'} onChange={e=>setForm({...form,is_active: e.target.value === 'active'})}><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
+          <div className="form-group"><label className="form-label">Assigned Vehicle</label>
+            <select className="form-select" value={form.assigned_vehicle_id || ''} onChange={e=>setForm({...form, assigned_vehicle_id: e.target.value})}>
+              <option value="">None</option>
+              {vehicles.filter(v => !v.assigned_driver_id || v.id === form.assigned_vehicle_id).map(v => <option key={v.id} value={v.id}>{v.registration} — {v.make} {v.model}</option>)}
+            </select>
+          </div>
         </div>
       </Modal>}
     </div>
