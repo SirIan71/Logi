@@ -60,9 +60,12 @@ export const exportToCSV = (data, filename, columns) => {
 };
 
 export const getTripProfitability = (trip, incomeData, expensesData) => {
-  const tripIncome = incomeData.filter(i => i.trip_id === trip.id).reduce((s, i) => s + i.amount, 0);
+  const tripIncomes = incomeData.filter(i => i.trip_id === trip.id);
+  const tripIncome = tripIncomes.reduce((s, i) => s + i.amount, 0);
+  const tripPaid = tripIncomes.reduce((s, i) => s + (i.amount_paid || 0), 0);
   const tripExpenses = expensesData.filter(e => e.trip_id === trip.id).reduce((s, e) => s + e.amount, 0);
-  return { income: tripIncome, expenses: tripExpenses, profit: tripIncome - tripExpenses, margin: tripIncome > 0 ? ((tripIncome - tripExpenses) / tripIncome * 100) : 0 };
+  const isPaid = tripIncomes.length > 0 && tripPaid >= tripIncome;
+  return { income: tripIncome, expenses: tripExpenses, profit: tripIncome - tripExpenses, margin: tripIncome > 0 ? ((tripIncome - tripExpenses) / tripIncome * 100) : 0, isPaid };
 };
 
 export const daysUntil = (dateStr) => {

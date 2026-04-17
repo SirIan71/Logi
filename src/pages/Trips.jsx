@@ -128,7 +128,9 @@ export default function Trips() {
                     <td>{t.cargo_type}</td>
                     <td>{formatDate(t.departure_date)}</td>
                     <td><StatusBadge status={t.status} /></td>
-                    <td className={`numeric ${prof.profit >= 0 ? 'positive' : 'negative'}`}>{prof.income > 0 ? formatCurrency(prof.profit) : '—'}</td>
+                    <td className={`numeric ${prof.isPaid ? (prof.profit >= 0 ? 'positive' : 'negative') : ''}`} style={{color: prof.isPaid ? undefined : 'var(--text-muted)'}}>
+                      {formatCurrency(prof.profit)}
+                    </td>
                     <td>
                       <div style={{display:'flex',gap:4}}>
                         <button className="btn-icon" onClick={() => openView(t)} title="View"><Eye size={16}/></button>
@@ -167,7 +169,7 @@ export default function Trips() {
               <div><div className="detail-label">Distance</div><div className="detail-value">{selected.actual_distance_km || selected.estimated_distance_km} km</div></div>
               <div><div className="detail-label">Income</div><div className="detail-value" style={{color:'var(--color-success)'}}>{formatCurrency(prof.income)}</div></div>
               <div><div className="detail-label">Expenses</div><div className="detail-value" style={{color:'var(--color-danger)'}}>{formatCurrency(prof.expenses)}</div></div>
-              <div><div className="detail-label">Profit</div><div className="detail-value" style={{color: prof.profit>=0?'var(--color-success)':'var(--color-danger)', fontWeight:700, fontSize:18}}>{formatCurrency(prof.profit)}</div></div>
+              <div><div className="detail-label">Profit</div><div className="detail-value" style={{color: prof.isPaid ? (prof.profit>=0?'var(--color-success)':'var(--color-danger)') : 'var(--text-muted)', fontWeight:700, fontSize:18}}>{formatCurrency(prof.profit)}</div></div>
             </div>
           ); })()}
         </Modal>
