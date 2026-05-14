@@ -1,21 +1,21 @@
 // Utility functions for SIRIAN
 export const formatCurrency = (amount) => {
-  return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
+  return new Intl.NumberFormat('en-UK', { style: 'currency', currency: 'KES', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
 };
 
 export const formatDate = (dateStr) => {
   if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' });
+  return new Date(dateStr).toLocaleDateString('en-UK', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
 export const formatDateTime = (dateStr) => {
   if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return new Date(dateStr).toLocaleString('en-UK', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
 export const formatNumber = (num, decimals = 0) => {
   if (num == null) return '—';
-  return new Intl.NumberFormat('en-ZA', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(num);
+  return new Intl.NumberFormat('en-UK', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(num);
 };
 
 export const getStatusColor = (status) => {

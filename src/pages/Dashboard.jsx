@@ -7,7 +7,8 @@ export default function Dashboard() {
 
   const stats = useMemo(() => {
     const actualIncome = income.filter(i => i.payment_status === 'paid').reduce((s, i) => s + i.amount_paid, 0);
-    const projectedIncome = income.reduce((s, i) => s + i.amount, 0);
+    const completedTripIds = new Set(trips.filter(t => t.status === 'completed').map(t => t.id));
+    const projectedIncome = income.filter(i => completedTripIds.has(i.trip_id)).reduce((s, i) => s + i.amount, 0);
     const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
     const outstanding = income.reduce((s, i) => s + (i.amount - i.amount_paid), 0);
     const redeemable = expenses.filter(e => e.is_redeemable && !e.is_redeemed).reduce((s, e) => s + e.amount, 0);

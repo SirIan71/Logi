@@ -105,6 +105,7 @@ export default function Fleet() {
                 <td><div style={{display:'flex',gap:4}}>
                   <button className="btn-icon" onClick={()=>openViewVehicle(v)}><Eye size={16}/></button>
                   <button className="btn-icon" onClick={()=>openEditVehicle(v)}><Edit2 size={16}/></button>
+                  <button className="btn-icon" onClick={()=>deleteItem('vehicles',v.id)} style={{color:'var(--color-danger)'}}><Trash2 size={16}/></button>
                 </div></td>
               </tr>
             ))}</tbody>
