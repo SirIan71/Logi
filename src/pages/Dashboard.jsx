@@ -17,25 +17,51 @@ export default function Dashboard() {
     const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
     const outstanding = income.reduce((s, i) => s + (i.amount - i.amount_paid), 0);
     const redeemable = expenses.filter(e => e.is_redeemable && !e.is_redeemed).reduce((s, e) => s + e.amount, 0);
-    const completedTrips = trips.filter(t => t.status === 'completed').slice(0, 4);
     const fleetActive = vehicles.filter(v => v.status === 'active').length;
-    return { actualIncome, projectedIncome, totalExpenses, netProfit: actualIncome - totalExpenses, outstanding, redeemable, completedTrips, fleetActive };
+    return { actualIncome, projectedIncome, totalExpenses, netProfit: actualIncome - totalExpenses, outstanding, redeemable, fleetActive };
   }, [trips, income, expenses, vehicles, clients, lookup]);
 
-  // Client revenue dynamic
-  const topClients = useMemo(() => {
+  // Client revenue dynamic — compute segments for doughnut + legend
+  const clientRevenue = useMemo(() => {
     const data = {};
     income.forEach(i => {
       const c = lookup('clients', i.client_id);
       const name = c?.company_name || 'Unknown';
       data[name] = (data[name] || 0) + i.amount;
     });
-    const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]).slice(0, 3);
-    const total = sorted.reduce((sum, item) => sum + item[1], 0) || 1;
-    return sorted.map(([name, amount], idx) => {
-      const colors = ['bg-primary', 'bg-secondary', 'bg-primary-container'];
-      return { name, percent: Math.round((amount / total) * 100), color: colors[idx] };
-    });
+    const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]);
+    const totalAll = sorted.reduce((sum, item) => sum + item[1], 0) || 1;
+    const uniqueClients = sorted.length;
+
+    // Hex colors for SVG strokes + matching Tailwind-style inline colors for dots
+    const segmentColors = ['#003539', '#516600', '#084D53', '#2C676D', '#86D3D7'];
+    const MAX_SHOWN = 5;
+    const top = sorted.slice(0, MAX_SHOWN);
+    const othersAmount = sorted.slice(MAX_SHOWN).reduce((s, [, a]) => s + a, 0);
+
+    const segments = top.map(([name, amount], idx) => ({
+      name,
+      amount,
+      percent: Math.round((amount / totalAll) * 100),
+      color: segmentColors[idx % segmentColors.length],
+    }));
+
+    if (othersAmount > 0) {
+      segments.push({
+        name: 'Others',
+        amount: othersAmount,
+        percent: Math.round((othersAmount / totalAll) * 100),
+        color: '#BFC8C9',
+      });
+    }
+
+    // Ensure percentages sum to 100
+    const pctSum = segments.reduce((s, seg) => s + seg.percent, 0);
+    if (pctSum !== 100 && segments.length > 0) {
+      segments[0].percent += (100 - pctSum);
+    }
+
+    return { segments, uniqueClients };
   }, [income, lookup]);
 
   // Revenue vs Expenses Trend
@@ -222,24 +248,44 @@ export default function Dashboard() {
           <div className="flex-1 flex flex-col items-center justify-center">
             <div className="relative w-48 h-48 mb-8">
               <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                <circle cx="18" cy="18" fill="transparent" r="15.9" stroke="#003539" strokeWidth="4" strokeDasharray="35 65"></circle>
-                <circle cx="18" cy="18" fill="transparent" r="15.9" stroke="#516600" strokeWidth="4" strokeDasharray="25 75" strokeDashoffset="-35"></circle>
-                <circle cx="18" cy="18" fill="transparent" r="15.9" stroke="#084D53" strokeWidth="4" strokeDasharray="20 80" strokeDashoffset="-60"></circle>
-                <circle cx="18" cy="18" fill="transparent" r="15.9" stroke="#BFC8C9" strokeWidth="4" strokeDasharray="20 80" strokeDashoffset="-80"></circle>
+                {clientRevenue.segments.length === 0 ? (
+                  <circle cx="18" cy="18" fill="transparent" r="15.9" stroke="#BFC8C9" strokeWidth="4" strokeDasharray="100 0" />
+                ) : (
+                  clientRevenue.segments.reduce((acc, seg, idx) => {
+                    const circumference = 100;
+                    const dashArray = `${seg.percent} ${circumference - seg.percent}`;
+                    const offset = -acc.offset;
+                    acc.circles.push(
+                      <circle
+                        key={idx}
+                        cx="18" cy="18" fill="transparent" r="15.9"
+                        stroke={seg.color}
+                        strokeWidth="4"
+                        strokeDasharray={dashArray}
+                        strokeDashoffset={offset}
+                        style={{ transition: 'stroke-dasharray 0.6s ease, stroke-dashoffset 0.6s ease' }}
+                      />
+                    );
+                    acc.offset += seg.percent;
+                    return acc;
+                  }, { circles: [], offset: 0 }).circles
+                )}
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-2xl font-extrabold font-headline text-primary">{clients.length}</span>
-                <span className="text-[10px] uppercase font-bold text-outline tracking-wider">Top Clients</span>
+                <span className="text-2xl font-extrabold font-headline text-primary">{clientRevenue.uniqueClients}</span>
+                <span className="text-[10px] uppercase font-bold text-outline tracking-wider">
+                  {clientRevenue.uniqueClients === 1 ? 'Client' : 'Clients'}
+                </span>
               </div>
             </div>
             <div className="w-full space-y-3">
-              {topClients.map((tc, idx) => (
+              {clientRevenue.segments.map((seg, idx) => (
                 <div key={idx} className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${tc.color}`}></div>
-                    <span className="text-xs font-medium text-on-surface-variant">{tc.name}</span>
+                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }}></div>
+                    <span className="text-xs font-medium text-on-surface-variant">{seg.name}</span>
                   </div>
-                  <span className="text-xs font-bold text-primary">{tc.percent}%</span>
+                  <span className="text-xs font-bold text-primary">{seg.percent}%</span>
                 </div>
               ))}
             </div>
@@ -248,33 +294,75 @@ export default function Dashboard() {
 
         <div className="lg:col-span-2 bg-surface-container-lowest p-8 rounded-xl shadow-sm overflow-hidden relative">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-headline font-extrabold text-primary">Trip Profitability</h3>
+            <h3 className="text-xl font-headline font-extrabold text-primary">Route Profitability</h3>
             <div className="flex items-center gap-4">
-              <span className="text-xs font-bold text-secondary bg-secondary-container px-3 py-1 rounded-full">{stats.completedTrips.length} Recent</span>
+              <span className="text-xs font-bold text-secondary bg-secondary-container px-3 py-1 rounded-full">
+                {(() => {
+                  const routeMap = {};
+                  trips.filter(t => t.status === 'completed').forEach(t => {
+                    const key = `${t.origin}→${t.destination}`;
+                    routeMap[key] = true;
+                  });
+                  return Object.keys(routeMap).length;
+                })()} Routes
+              </span>
             </div>
           </div>
 
           <div className="space-y-6">
-            {stats.completedTrips.map((t, idx) => {
-              const prof = getTripProfitability(t, income, expenses);
-              const percent = prof.income > 0 ? Math.round((prof.profit / prof.income) * 100) : 0;
-              const barColor = idx === 1 ? 'bg-secondary' : percent < 50 ? 'bg-primary/40' : 'bg-primary';
-              return (
+            {(() => {
+              // Aggregate completed trips by route
+              const routeMap = {};
+              trips.filter(t => t.status === 'completed').forEach(t => {
+                const key = `${t.origin}→${t.destination}`;
+                if (!routeMap[key]) routeMap[key] = { origin: t.origin, destination: t.destination, trips: [] };
+                routeMap[key].trips.push(t);
+              });
+
+              // Calculate aggregate profitability per route
+              const routes = Object.values(routeMap).map(r => {
+                let totalIncome = 0, totalExpenses = 0;
+                r.trips.forEach(t => {
+                  const prof = getTripProfitability(t, income, expenses);
+                  totalIncome += prof.income;
+                  totalExpenses += prof.expenses;
+                });
+                const profit = totalIncome - totalExpenses;
+                const margin = totalIncome > 0 ? Math.round((profit / totalIncome) * 100) : 0;
+                return { ...r, totalIncome, totalExpenses, profit, margin, tripCount: r.trips.length };
+              });
+
+              // Sort by profit descending, show top 5
+              routes.sort((a, b) => b.profit - a.profit);
+              const topRoutes = routes.slice(0, 5);
+              const barColors = ['bg-primary', 'bg-secondary', 'bg-primary-container', 'bg-primary/70', 'bg-secondary/70'];
+
+              if (topRoutes.length === 0) {
+                return <p className="text-sm text-outline">No completed routes found.</p>;
+              }
+
+              return topRoutes.map((r, idx) => (
                 <div key={idx}>
                   <div className="flex justify-between mb-2">
-                    <span className="text-xs font-bold text-primary uppercase">Route: {t.origin.slice(0, 3)} → {t.destination.slice(0, 3)}</span>
-                    <span className="text-xs font-bold text-primary">{formatCurrency(prof.profit)} ({percent}%)</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-primary uppercase">
+                        {r.origin.slice(0, 3)} → {r.destination.slice(0, 3)}
+                      </span>
+                      <span className="text-[10px] font-medium text-outline bg-surface-container-high px-1.5 py-0.5 rounded">
+                        {r.tripCount} trip{r.tripCount !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <span className="text-xs font-bold text-primary">{formatCurrency(r.profit)} ({r.margin}%)</span>
                   </div>
                   <div className="w-full bg-surface-container-high h-2.5 rounded-full overflow-hidden">
-                    <div className={`${barColor} h-full rounded-full transition-all duration-500`} style={{ width: `${Math.max(percent, 0)}%` }}></div>
+                    <div
+                      className={`${barColors[idx % barColors.length]} h-full rounded-full transition-all duration-500`}
+                      style={{ width: `${Math.max(r.margin, 0)}%` }}
+                    ></div>
                   </div>
                 </div>
-              );
-            })}
-
-            {stats.completedTrips.length === 0 && (
-              <p className="text-sm text-outline">No recent completed trips found.</p>
-            )}
+              ));
+            })()}
           </div>
 
           <div className="mt-8 pt-6 border-t border-outline-variant/10 flex items-center justify-between">
