@@ -53,7 +53,7 @@ export default function Fleet() {
   const closeModal = () => { setModal(null); setSelected(null); setForm({}); };
 
   const saveVehicle = () => {
-    const data = { ...form, year: +form.year, capacity_tons: +form.capacity_tons, current_odometer: +form.current_odometer, tank_capacity_liters: +form.tank_capacity_liters };
+    const data = { ...form, year: +form.year, capacity_tons: +form.capacity_tons, current_odometer: +form.current_odometer, tank_capacity_liters: +form.tank_capacity_liters, avg_consumption_rate: +form.avg_consumption_rate || 0 };
     if (modal === 'addVehicle') addItem('vehicles', { ...data, id: generateId('v') });
     else updateItem('vehicles', data);
     closeModal();
@@ -139,20 +139,45 @@ export default function Fleet() {
         </div>
       </div>}
 
-      {modal === 'viewVehicle' && selected && <Modal title={`${selected.registration} — ${selected.make} ${selected.model}`} onClose={closeModal}>
-        <div className="detail-grid">
-          <div><div className="detail-label">Registration</div><div className="detail-value">{selected.registration}</div></div>
-          <div><div className="detail-label">Make / Model</div><div className="detail-value">{selected.make} {selected.model}</div></div>
-          <div><div className="detail-label">Year</div><div className="detail-value">{selected.year}</div></div>
-          <div><div className="detail-label">Capacity</div><div className="detail-value">{selected.capacity_tons} tons</div></div>
-          <div><div className="detail-label">Odometer</div><div className="detail-value">{formatNumber(selected.current_odometer)} km</div></div>
-          <div><div className="detail-label">Tank</div><div className="detail-value">{selected.tank_capacity_liters} L</div></div>
-          <div><div className="detail-label">Driver</div><div className="detail-value">{selected.driverName}</div></div>
-          <div><div className="detail-label">Status</div><div className="detail-value"><StatusBadge status={selected.status}/></div></div>
-          <div><div className="detail-label">Total Trips</div><div className="detail-value" style={{fontSize:20,fontWeight:700}}>{selected.tripCount}</div></div>
-          <div><div className="detail-label">Total Fuel Cost</div><div className="detail-value" style={{fontSize:20,fontWeight:700,color:'var(--color-warning)'}}>{formatCurrency(selected.totalFuelCost)}</div></div>
-        </div>
-      </Modal>}
+      {modal === 'viewVehicle' && selected && (() => {
+        const vFuel = fuelRecords.filter(f => f.vehicle_id === selected.id);
+        const vTripsForFuel = trips.filter(t => t.vehicle_id === selected.id && t.actual_distance_km);
+        const totalLiters = vFuel.reduce((s, f) => s + f.liters, 0);
+        const totalKm = vTripsForFuel.reduce((s, t) => s + t.actual_distance_km, 0);
+        const actualAvgConsumption = totalKm > 0 ? (totalLiters / totalKm * 100) : null;
+        return (
+        <Modal title={`${selected.registration} — ${selected.make} ${selected.model}`} onClose={closeModal}>
+          <div className="detail-grid">
+            <div><div className="detail-label">Registration</div><div className="detail-value">{selected.registration}</div></div>
+            <div><div className="detail-label">Make / Model</div><div className="detail-value">{selected.make} {selected.model}</div></div>
+            <div><div className="detail-label">Year</div><div className="detail-value">{selected.year}</div></div>
+            <div><div className="detail-label">Capacity</div><div className="detail-value">{selected.capacity_tons} tons</div></div>
+            <div><div className="detail-label">Odometer</div><div className="detail-value">{formatNumber(selected.current_odometer)} km</div></div>
+            <div><div className="detail-label">Tank</div><div className="detail-value">{selected.tank_capacity_liters} L</div></div>
+            <div><div className="detail-label">Driver</div><div className="detail-value">{selected.driverName}</div></div>
+            <div><div className="detail-label">Status</div><div className="detail-value"><StatusBadge status={selected.status}/></div></div>
+            <div><div className="detail-label">Total Trips</div><div className="detail-value" style={{fontSize:20,fontWeight:700}}>{selected.tripCount}</div></div>
+            <div><div className="detail-label">Total Fuel Cost</div><div className="detail-value" style={{fontSize:20,fontWeight:700,color:'var(--color-warning)'}}>{formatCurrency(selected.totalFuelCost)}</div></div>
+          </div>
+          <div style={{marginTop:20,padding:16,borderRadius:12,background:'var(--surface-container-low)',border:'1px solid var(--outline-variant)'}}>
+            <div style={{fontSize:13,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em',color:'var(--text-muted)',marginBottom:12}}>Fuel Consumption</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+              <div>
+                <div className="detail-label">Rated Avg Consumption</div>
+                <div className="detail-value" style={{fontSize:18,fontWeight:700,color:'var(--color-info)'}}>{selected.avg_consumption_rate ? `${formatNumber(selected.avg_consumption_rate, 1)} L/100km` : '—'}</div>
+              </div>
+              <div>
+                <div className="detail-label">Actual Avg Consumption</div>
+                <div className="detail-value" style={{fontSize:18,fontWeight:700,color: actualAvgConsumption !== null ? (selected.avg_consumption_rate && actualAvgConsumption > selected.avg_consumption_rate * 1.1 ? 'var(--color-danger)' : 'var(--color-success)') : 'var(--text-secondary)'}}>
+                  {actualAvgConsumption !== null ? `${formatNumber(actualAvgConsumption, 1)} L/100km` : 'No data'}
+                </div>
+              </div>
+            </div>
+            {actualAvgConsumption !== null && <div style={{fontSize:11,color:'var(--text-muted)',marginTop:8}}>Based on {formatNumber(totalLiters, 0)} L over {formatNumber(totalKm, 0)} km ({vFuel.length} fuel records)</div>}
+          </div>
+        </Modal>
+        );
+      })()}
 
       {(modal === 'addVehicle' || modal === 'editVehicle') && <Modal title={modal==='addVehicle'?'Add Vehicle':'Edit Vehicle'} onClose={closeModal}
         footer={<><button className="btn btn-secondary" onClick={closeModal}>Cancel</button><button className="btn btn-primary" onClick={saveVehicle}>Save</button></>}>
@@ -166,6 +191,7 @@ export default function Fleet() {
           <div className="form-group"><label className="form-label">Tank (L)</label><input className="form-input" type="number" value={form.tank_capacity_liters||''} onChange={e=>setForm({...form,tank_capacity_liters:e.target.value})}/></div>
           <div className="form-group"><label className="form-label">Assigned Driver</label>
             <select className="form-select" value={form.assigned_driver_id||''} onChange={e=>setForm({...form,assigned_driver_id:e.target.value||null})}><option value="">Unassigned</option>{drivers.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
+          <div className="form-group"><label className="form-label">Avg Consumption (L/100km)</label><input className="form-input" type="number" step="0.1" placeholder="e.g. 35.0" value={form.avg_consumption_rate||''} onChange={e=>setForm({...form,avg_consumption_rate:e.target.value})}/></div>
           <div className="form-group"><label className="form-label">Status</label><select className="form-select" value={form.status||'active'} onChange={e=>setForm({...form,status:e.target.value})}><option value="active">Active</option><option value="maintenance">In Maintenance</option><option value="decommissioned">Decommissioned</option></select></div>
         </div>
       </Modal>}

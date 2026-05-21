@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { formatCurrency, formatDate, formatNumber, searchFilter, generateId, exportToCSV } from '../utils/helpers';
+import { useFuelPrices } from '../utils/useFuelPrices';
 import Modal from '../components/common/Modal';
-import { Plus, Search, Download, Edit2, Trash2, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Download, Edit2, Trash2, AlertTriangle, RefreshCw, Fuel as FuelIcon } from 'lucide-react';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Filler, Tooltip, Legend } from 'chart.js';
 import { Line, Bar } from 'react-chartjs-2';
 
@@ -12,10 +13,12 @@ const chartOpts = { responsive: true, maintainAspectRatio: false, plugins: { leg
 export default function Fuel() {
   const { fuelRecords, vehicles, trips, lookup, addItem, updateItem, deleteItem } = useApp();
   const drivers = useApp().users.filter(u => u.role === 'driver');
+  const { prices: fuelPrices, loading: pricesLoading, refresh: refreshPrices, updateRates } = useFuelPrices();
   const [search, setSearch] = useState('');
   const [vehicleFilter, setVehicleFilter] = useState('all');
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState({});
+  const [rateForm, setRateForm] = useState({});
 
   const filtered = useMemo(() => {
     let data = vehicleFilter === 'all' ? fuelRecords : fuelRecords.filter(f => f.vehicle_id === vehicleFilter);
@@ -69,7 +72,19 @@ export default function Fuel() {
 
   const openAdd = () => { setForm({ date: new Date().toISOString().split('T')[0] }); setModal('add'); };
   const openEdit = (f) => { setForm({ ...f }); setModal('edit'); };
-  const closeModal = () => { setModal(null); setForm({}); };
+  const openRateUpdate = () => {
+    setRateForm({
+      super_petrol: fuelPrices?.super_petrol || '',
+      diesel: fuelPrices?.diesel || '',
+      kerosene: fuelPrices?.kerosene || '',
+      effective_from: fuelPrices?.effective_from || '',
+      effective_to: fuelPrices?.effective_to || '',
+      location: fuelPrices?.location || 'Nairobi',
+    });
+    setModal('updateRates');
+  };
+  const closeModal = () => { setModal(null); setForm({}); setRateForm({}); };
+
   const save = () => { 
     const data = { ...form, liters: +form.liters, cost: +form.cost, odometer_reading: +form.odometer_reading }; 
     if (modal === 'add') addItem('fuelRecords', { ...data, id: generateId('f') }); 
@@ -86,6 +101,23 @@ export default function Fuel() {
     closeModal(); 
   };
 
+  const saveRates = () => {
+    updateRates({
+      super_petrol: +rateForm.super_petrol,
+      diesel: +rateForm.diesel,
+      kerosene: +rateForm.kerosene,
+      effective_from: rateForm.effective_from,
+      effective_to: rateForm.effective_to,
+      location: rateForm.location,
+    });
+    closeModal();
+  };
+
+  // Formatted last update time
+  const lastUpdated = fuelPrices?.fetched_at
+    ? new Date(fuelPrices.fetched_at).toLocaleString('en-UK', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : '—';
+
   return (
     <div>
       <div className="page-header"><h1>Fuel Tracking</h1>
@@ -99,10 +131,108 @@ export default function Fuel() {
         </div>
       </div>
 
+      {/* ── Live Kenya Fuel Rates Banner ── */}
+      <div style={{
+        background: 'linear-gradient(135deg, var(--surface-container-low) 0%, var(--surface-container) 100%)',
+        border: '1px solid var(--outline-variant)',
+        borderRadius: 16,
+        padding: '20px 24px',
+        marginBottom: 20,
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        <div style={{ position: 'absolute', right: -20, top: -20, opacity: 0.04 }}>
+          <FuelIcon size={160} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, position: 'relative', zIndex: 1 }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="material-symbols-outlined" style={{ color: 'var(--color-warning)', fontSize: 20 }}>local_gas_station</span>
+              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-warning)' }}>
+                Kenya Fuel Rates (EPRA)
+              </h3>
+              <span style={{
+                fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                background: 'var(--color-success-bg)', color: 'var(--color-success)',
+                textTransform: 'uppercase', letterSpacing: '0.05em',
+              }}>
+                {pricesLoading ? 'Loading...' : 'Live'}
+              </span>
+            </div>
+            <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>
+              {fuelPrices?.location || 'Nairobi'} • Effective {fuelPrices?.effective_from || '—'} to {fuelPrices?.effective_to || '—'}
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="btn-icon"
+              onClick={refreshPrices}
+              title="Refresh rates"
+              style={{ opacity: pricesLoading ? 0.5 : 1 }}
+              disabled={pricesLoading}
+            >
+              <RefreshCw size={16} style={{ animation: pricesLoading ? 'spin 1s linear infinite' : 'none' }} />
+            </button>
+            <button
+              className="btn btn-secondary"
+              onClick={openRateUpdate}
+              style={{ fontSize: 11, padding: '4px 12px' }}
+            >
+              Update Rates
+            </button>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, position: 'relative', zIndex: 1 }}>
+          <div style={{
+            background: 'var(--surface-container-lowest)',
+            borderRadius: 12, padding: '16px 20px',
+            borderLeft: '4px solid #F59E0B',
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 4 }}>Super Petrol</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: '#F59E0B', fontFamily: 'var(--font-headline)' }}>
+              KES {fuelPrices?.super_petrol ? formatNumber(fuelPrices.super_petrol, 2) : '—'}
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>per litre</div>
+          </div>
+          <div style={{
+            background: 'var(--surface-container-lowest)',
+            borderRadius: 12, padding: '16px 20px',
+            borderLeft: '4px solid #3B82F6',
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 4 }}>Diesel</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: '#3B82F6', fontFamily: 'var(--font-headline)' }}>
+              KES {fuelPrices?.diesel ? formatNumber(fuelPrices.diesel, 2) : '—'}
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>per litre</div>
+          </div>
+          <div style={{
+            background: 'var(--surface-container-lowest)',
+            borderRadius: 12, padding: '16px 20px',
+            borderLeft: '4px solid #8B5CF6',
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 4 }}>Kerosene</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: '#8B5CF6', fontFamily: 'var(--font-headline)' }}>
+              KES {fuelPrices?.kerosene ? formatNumber(fuelPrices.kerosene, 2) : '—'}
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>per litre</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, position: 'relative', zIndex: 1 }}>
+          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+            Source: {fuelPrices?.source || 'EPRA Kenya'} • Last checked: {lastUpdated}
+          </span>
+          <span style={{ fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+            Auto-refreshes daily at midnight
+          </span>
+        </div>
+      </div>
+
       <div className="kpi-grid" style={{gridTemplateColumns:'repeat(4,1fr)',marginBottom:20}}>
         <div className="kpi-card" style={{'--kpi-color':'var(--color-warning)','--kpi-bg':'var(--color-warning-bg)'}}><div className="kpi-value">{formatCurrency(totals.totalCost)}</div><div className="kpi-label">Total Fuel Cost</div></div>
         <div className="kpi-card" style={{'--kpi-color':'var(--color-info)','--kpi-bg':'var(--color-info-bg)'}}><div className="kpi-value">{formatNumber(totals.totalLiters)} L</div><div className="kpi-label">Total Liters</div></div>
-        <div className="kpi-card" style={{'--kpi-color':'var(--color-success)','--kpi-bg':'var(--color-success-bg)'}}><div className="kpi-value">R{formatNumber(totals.avgPricePerLiter, 2)}/L</div><div className="kpi-label">Avg Price/Liter</div></div>
+        <div className="kpi-card" style={{'--kpi-color':'var(--color-success)','--kpi-bg':'var(--color-success-bg)'}}><div className="kpi-value">KES {formatNumber(totals.avgPricePerLiter, 2)}/L</div><div className="kpi-label">Avg Price/Liter (Actual)</div></div>
         <div className="kpi-card" style={{'--kpi-color': anomalies.length > 0 ? 'var(--color-danger)' : 'var(--color-success)','--kpi-bg': anomalies.length > 0 ? 'var(--color-danger-bg)' : 'var(--color-success-bg)'}}><div className="kpi-value">{anomalies.length}</div><div className="kpi-label">Fuel Anomalies</div></div>
       </div>
 
@@ -127,14 +257,22 @@ export default function Fuel() {
         </div>
         <div style={{overflowX:'auto'}}>
           <table className="data-table">
-            <thead><tr><th>Date</th><th>Vehicle</th><th>Liters</th><th>Cost</th><th>Odometer</th><th>Station</th><th>Trip</th><th>Actions</th></tr></thead>
-            <tbody>{filtered.length === 0 ? <tr><td colSpan={8} className="table-empty">No records</td></tr> :
-              filtered.map(f => { const trip = lookup('trips', f.trip_id); return (
+            <thead><tr><th>Date</th><th>Vehicle</th><th>Liters</th><th>Cost</th><th>Price/L</th><th>Odometer</th><th>Station</th><th>Trip</th><th>Actions</th></tr></thead>
+            <tbody>{filtered.length === 0 ? <tr><td colSpan={9} className="table-empty">No records</td></tr> :
+              filtered.map(f => { const trip = lookup('trips', f.trip_id); const pricePerL = f.liters > 0 ? f.cost / f.liters : 0; return (
                 <tr key={f.id}>
                   <td>{formatDate(f.date)}</td>
                   <td className="primary">{lookup('vehicles', f.vehicle_id)?.registration||'—'}</td>
                   <td className="numeric">{formatNumber(f.liters)} L</td>
                   <td className="numeric">{formatCurrency(f.cost)}</td>
+                  <td className="numeric" style={{
+                    color: fuelPrices?.diesel && pricePerL > fuelPrices.diesel * 1.05
+                      ? 'var(--color-danger)'
+                      : 'var(--text-secondary)',
+                    fontWeight: fuelPrices?.diesel && pricePerL > fuelPrices.diesel * 1.05 ? 600 : 400,
+                  }}>
+                    KES {formatNumber(pricePerL, 2)}
+                  </td>
                   <td className="numeric">{formatNumber(f.odometer_reading)} km</td>
                   <td>{f.station}</td>
                   <td>{trip?`${trip.origin}→${trip.destination}`:'—'}</td>
@@ -143,23 +281,60 @@ export default function Fuel() {
                     <button className="btn-icon" onClick={()=>deleteItem('fuelRecords',f.id)}><Trash2 size={16}/></button>
                   </div></td>
                 </tr>
-              ); })}
+              ); })
+            }
             </tbody>
           </table>
         </div>
         <div className="table-footer"><span>{filtered.length} records</span></div>
       </div>
 
-      {modal && <Modal title={modal==='add'?'Record Fuel':'Edit Fuel Record'} onClose={closeModal}
+      {/* Record / Edit Fuel Modal */}
+      {(modal === 'add' || modal === 'edit') && <Modal title={modal==='add'?'Record Fuel':'Edit Fuel Record'} onClose={closeModal}
         footer={<><button className="btn btn-secondary" onClick={closeModal}>Cancel</button><button className="btn btn-primary" onClick={save}>Save</button></>}>
         <div className="form-grid">
           <div className="form-group"><label className="form-label">Vehicle</label><select className="form-select" value={form.vehicle_id||''} onChange={e=>setForm({...form,vehicle_id:e.target.value})}><option value="">Select</option>{vehicles.map(v=><option key={v.id} value={v.id}>{v.registration}</option>)}</select></div>
           <div className="form-group"><label className="form-label">Trip</label><select className="form-select" value={form.trip_id||''} onChange={e=>setForm({...form,trip_id:e.target.value})}><option value="">None</option>{trips.map(t=><option key={t.id} value={t.id}>{t.origin}→{t.destination}</option>)}</select></div>
           <div className="form-group"><label className="form-label">Liters</label><input className="form-input" type="number" value={form.liters||''} onChange={e=>setForm({...form,liters:e.target.value})}/></div>
-          <div className="form-group"><label className="form-label">Cost (R)</label><input className="form-input" type="number" value={form.cost||''} onChange={e=>setForm({...form,cost:e.target.value})}/></div>
+          <div className="form-group"><label className="form-label">Cost (KES)</label><input className="form-input" type="number" value={form.cost||''} onChange={e=>setForm({...form,cost:e.target.value})}/></div>
           <div className="form-group"><label className="form-label">Odometer Reading</label><input className="form-input" type="number" value={form.odometer_reading||''} onChange={e=>setForm({...form,odometer_reading:e.target.value})}/></div>
           <div className="form-group"><label className="form-label">Station</label><input className="form-input" value={form.station||''} onChange={e=>setForm({...form,station:e.target.value})}/></div>
           <div className="form-group"><label className="form-label">Date</label><input className="form-input" type="date" value={form.date||''} onChange={e=>setForm({...form,date:e.target.value})}/></div>
+          {form.liters > 0 && form.cost > 0 && (
+            <div className="form-group">
+              <label className="form-label">Price per Litre</label>
+              <div style={{
+                padding: '10px 14px', borderRadius: 8,
+                background: 'var(--surface-container-high)',
+                fontSize: 16, fontWeight: 700,
+                color: fuelPrices?.diesel && (+form.cost / +form.liters) > fuelPrices.diesel * 1.05
+                  ? 'var(--color-danger)' : 'var(--color-success)',
+              }}>
+                KES {formatNumber(+form.cost / +form.liters, 2)}/L
+                {fuelPrices?.diesel && (
+                  <span style={{ fontSize: 10, marginLeft: 8, color: 'var(--text-muted)', fontWeight: 400 }}>
+                    (EPRA Diesel: KES {formatNumber(fuelPrices.diesel, 2)})
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </Modal>}
+
+      {/* Update EPRA Rates Modal */}
+      {modal === 'updateRates' && <Modal title="Update EPRA Fuel Rates" onClose={closeModal}
+        footer={<><button className="btn btn-secondary" onClick={closeModal}>Cancel</button><button className="btn btn-primary" onClick={saveRates}>Save Rates</button></>}>
+        <div style={{ marginBottom: 16, padding: 12, borderRadius: 8, background: 'var(--color-info-bg)', color: 'var(--color-info)', fontSize: 12 }}>
+          <strong>ℹ️ Manual Update:</strong> Enter the latest EPRA-published rates. These prices are typically updated around the 14th of each month on <a href="https://www.epra.go.ke" target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>epra.go.ke</a>
+        </div>
+        <div className="form-grid">
+          <div className="form-group"><label className="form-label">Super Petrol (KES/L)</label><input className="form-input" type="number" step="0.01" value={rateForm.super_petrol||''} onChange={e=>setRateForm({...rateForm,super_petrol:e.target.value})}/></div>
+          <div className="form-group"><label className="form-label">Diesel (KES/L)</label><input className="form-input" type="number" step="0.01" value={rateForm.diesel||''} onChange={e=>setRateForm({...rateForm,diesel:e.target.value})}/></div>
+          <div className="form-group"><label className="form-label">Kerosene (KES/L)</label><input className="form-input" type="number" step="0.01" value={rateForm.kerosene||''} onChange={e=>setRateForm({...rateForm,kerosene:e.target.value})}/></div>
+          <div className="form-group"><label className="form-label">Location</label><input className="form-input" value={rateForm.location||''} onChange={e=>setRateForm({...rateForm,location:e.target.value})}/></div>
+          <div className="form-group"><label className="form-label">Effective From</label><input className="form-input" type="date" value={rateForm.effective_from||''} onChange={e=>setRateForm({...rateForm,effective_from:e.target.value})}/></div>
+          <div className="form-group"><label className="form-label">Effective To</label><input className="form-input" type="date" value={rateForm.effective_to||''} onChange={e=>setRateForm({...rateForm,effective_to:e.target.value})}/></div>
         </div>
       </Modal>}
     </div>
