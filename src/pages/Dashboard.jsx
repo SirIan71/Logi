@@ -7,15 +7,20 @@ export default function Dashboard() {
 
   const stats = useMemo(() => {
     const actualIncome = income.filter(i => i.payment_status === 'paid').reduce((s, i) => s + i.amount_paid, 0);
-    const completedTripIds = new Set(trips.filter(t => t.status === 'completed').map(t => t.id));
-    const projectedIncome = income.filter(i => completedTripIds.has(i.trip_id)).reduce((s, i) => s + i.amount, 0);
+    const completedTripsAll = trips.filter(t => t.status === 'completed');
+    const projectedIncome = completedTripsAll.reduce((s, t) => {
+      const client = lookup('clients', t.client_id);
+      if (!client || !client.rate_amount) return s;
+      if (client.rate_type === 'per_ton') return s + (t.cargo_weight_tons || 0) * client.rate_amount;
+      return s + client.rate_amount;
+    }, 0);
     const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
     const outstanding = income.reduce((s, i) => s + (i.amount - i.amount_paid), 0);
     const redeemable = expenses.filter(e => e.is_redeemable && !e.is_redeemed).reduce((s, e) => s + e.amount, 0);
     const completedTrips = trips.filter(t => t.status === 'completed').slice(0, 4);
     const fleetActive = vehicles.filter(v => v.status === 'active').length;
     return { actualIncome, projectedIncome, totalExpenses, netProfit: actualIncome - totalExpenses, outstanding, redeemable, completedTrips, fleetActive };
-  }, [trips, income, expenses, vehicles]);
+  }, [trips, income, expenses, vehicles, clients, lookup]);
 
   // Client revenue dynamic
   const topClients = useMemo(() => {
