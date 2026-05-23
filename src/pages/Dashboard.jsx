@@ -18,7 +18,80 @@ export default function Dashboard() {
     const outstanding = income.reduce((s, i) => s + (i.amount - i.amount_paid), 0);
     const redeemable = expenses.filter(e => e.is_redeemable && !e.is_redeemed).reduce((s, e) => s + e.amount, 0);
     const fleetActive = vehicles.filter(v => v.status === 'active').length;
-    return { actualIncome, projectedIncome, totalExpenses, netProfit: actualIncome - totalExpenses, outstanding, redeemable, fleetActive };
+
+    // --- Month-over-month % change calculations ---
+    const getMonth = (dateStr) => {
+      if (!dateStr) return null;
+      const d = new Date(dateStr);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    };
+
+    const pctChange = (curr, prev) => {
+      if (prev === 0 && curr === 0) return 0;
+      if (prev === 0) return 100;
+      return Math.round(((curr - prev) / Math.abs(prev)) * 100);
+    };
+
+    // Determine the two most recent months that have ANY data
+    const allMonths = new Set();
+    income.forEach(i => { const m = getMonth(i.payment_date || i.due_date); if (m) allMonths.add(m); });
+    expenses.forEach(e => { const m = getMonth(e.expense_date); if (m) allMonths.add(m); });
+    completedTripsAll.forEach(t => { const m = getMonth(t.departure_date); if (m) allMonths.add(m); });
+
+    const sortedMonths = [...allMonths].sort();
+    const currMonth = sortedMonths[sortedMonths.length - 1] || null;
+    const prevMonth = sortedMonths.length >= 2 ? sortedMonths[sortedMonths.length - 2] : null;
+
+    // Projected Income MoM (based on completed trip departure dates)
+    const projByMonth = (month) => {
+      if (!month) return 0;
+      return completedTripsAll.filter(t => getMonth(t.departure_date) === month).reduce((s, t) => {
+        const client = lookup('clients', t.client_id);
+        if (!client || !client.rate_amount) return s;
+        if (client.rate_type === 'per_ton') return s + (t.cargo_weight_tons || 0) * client.rate_amount;
+        return s + client.rate_amount;
+      }, 0);
+    };
+    const projectedChange = pctChange(projByMonth(currMonth), projByMonth(prevMonth));
+
+    // Actual Income MoM (paid income by payment_date)
+    const actualByMonth = (month) => {
+      if (!month) return 0;
+      return income.filter(i => i.payment_status === 'paid' && getMonth(i.payment_date) === month).reduce((s, i) => s + i.amount_paid, 0);
+    };
+    const actualChange = pctChange(actualByMonth(currMonth), actualByMonth(prevMonth));
+
+    // Total Expenses MoM
+    const expByMonth = (month) => {
+      if (!month) return 0;
+      return expenses.filter(e => getMonth(e.expense_date) === month).reduce((s, e) => s + e.amount, 0);
+    };
+    const expensesChange = pctChange(expByMonth(currMonth), expByMonth(prevMonth));
+
+    // Net Profit MoM
+    const netByMonth = (month) => actualByMonth(month) - expByMonth(month);
+    const netChange = pctChange(netByMonth(currMonth), netByMonth(prevMonth));
+
+    // Route Profitability MoM (aggregate margin of completed trips)
+    const routeMarginByMonth = (month) => {
+      if (!month) return 0;
+      const monthTrips = completedTripsAll.filter(t => getMonth(t.departure_date) === month);
+      let totalInc = 0, totalExp = 0;
+      monthTrips.forEach(t => {
+        const prof = getTripProfitability(t, income, expenses);
+        totalInc += prof.income;
+        totalExp += prof.expenses;
+      });
+      return totalInc > 0 ? Math.round(((totalInc - totalExp) / totalInc) * 100) : 0;
+    };
+    const routeChange = pctChange(routeMarginByMonth(currMonth), routeMarginByMonth(prevMonth));
+
+    return {
+      actualIncome, projectedIncome, totalExpenses,
+      netProfit: actualIncome - totalExpenses,
+      outstanding, redeemable, fleetActive,
+      projectedChange, actualChange, expensesChange, netChange, routeChange,
+    };
   }, [trips, income, expenses, vehicles, clients, lookup]);
 
   // Client revenue dynamic — compute segments for doughnut + legend
@@ -66,10 +139,26 @@ export default function Dashboard() {
 
   // Revenue vs Expenses Trend
   const revenueTrend = useMemo(() => {
-    const monthlyData = {};
-    const now = new Date('2026-04-15'); // Reference against system seed data date center
+    // Determine the latest month from actual data instead of hardcoding
+    let latestDate = null;
+    income.forEach(i => {
+      const dateStr = i.payment_date || i.due_date;
+      if (!dateStr) return;
+      const d = new Date(dateStr);
+      if (!latestDate || d > latestDate) latestDate = d;
+    });
+    expenses.forEach(e => {
+      if (!e.expense_date) return;
+      const d = new Date(e.expense_date);
+      if (!latestDate || d > latestDate) latestDate = d;
+    });
 
-    // Pre-fill last 6 months
+    // Fallback to current date if no data
+    const now = latestDate || new Date();
+
+    const monthlyData = {};
+
+    // Pre-fill 6 months ending at the latest month with data
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -105,6 +194,25 @@ export default function Dashboard() {
     }));
   }, [income, expenses]);
 
+  const ChangeBadge = ({ value, invertColor = false }) => {
+    const isPositive = value > 0;
+    const isNegative = value < 0;
+    const isNeutral = value === 0;
+    // For expenses, a positive change is bad (inverted)
+    const goodChange = invertColor ? isNegative : isPositive;
+    const badChange = invertColor ? isPositive : isNegative;
+    const colorClasses = goodChange
+      ? 'text-secondary bg-secondary-container'
+      : badChange
+      ? 'text-error bg-error-container'
+      : 'text-outline bg-surface-container-high';
+    return (
+      <span className={`text-xs font-bold px-2 py-1 rounded-full ${colorClasses}`}>
+        {isPositive ? '+' : ''}{value}%
+      </span>
+    );
+  };
+
   return (
     <>
       <div className="flex justify-between items-end">
@@ -120,7 +228,7 @@ export default function Dashboard() {
             <div className="p-2 bg-primary/5 rounded-lg">
               <span className="material-symbols-outlined text-primary">trending_up</span>
             </div>
-            <span className="text-xs font-bold text-secondary bg-secondary-container px-2 py-1 rounded-full">+12%</span>
+            <ChangeBadge value={stats.projectedChange} />
           </div>
           <p className="text-sm text-on-surface-variant font-medium">Projected Income</p>
           <h3 className="text-2xl font-headline font-extrabold text-primary mt-1">{formatCurrency(stats.projectedIncome)}</h3>
@@ -131,7 +239,7 @@ export default function Dashboard() {
             <div className="p-2 bg-primary/5 rounded-lg">
               <span className="material-symbols-outlined text-primary">account_balance_wallet</span>
             </div>
-            <span className="text-xs font-bold text-secondary bg-secondary-container px-2 py-1 rounded-full">+8%</span>
+            <ChangeBadge value={stats.actualChange} />
           </div>
           <p className="text-sm text-on-surface-variant font-medium">Actual Income</p>
           <h3 className="text-2xl font-headline font-extrabold text-primary mt-1">{formatCurrency(stats.actualIncome)}</h3>
@@ -142,7 +250,7 @@ export default function Dashboard() {
             <div className="p-2 bg-error/5 rounded-lg">
               <span className="material-symbols-outlined text-error">receipt_long</span>
             </div>
-            <span className="text-xs font-bold text-error bg-error-container px-2 py-1 rounded-full">+5%</span>
+            <ChangeBadge value={stats.expensesChange} invertColor={true} />
           </div>
           <p className="text-sm text-on-surface-variant font-medium">Total Expenses</p>
           <h3 className="text-2xl font-headline font-extrabold text-primary mt-1">{formatCurrency(stats.totalExpenses)}</h3>
@@ -154,7 +262,7 @@ export default function Dashboard() {
               <div className="p-2 bg-white/10 rounded-lg">
                 <span className="material-symbols-outlined text-secondary-fixed">insights</span>
               </div>
-              <span className="text-xs font-bold text-primary bg-secondary-fixed px-2 py-1 rounded-full">{stats.netProfit >= 0 ? '+' : '-'}15%</span>
+              <span className={`text-xs font-bold px-2 py-1 rounded-full ${stats.netChange >= 0 ? 'text-primary bg-secondary-fixed' : 'text-error bg-error-container'}`}>{stats.netChange > 0 ? '+' : ''}{stats.netChange}%</span>
             </div>
             <p className="text-sm text-white/70 font-medium">Net Profit</p>
             <h3 className="text-2xl font-headline font-extrabold text-white mt-1">{formatCurrency(stats.netProfit)}</h3>
@@ -295,7 +403,8 @@ export default function Dashboard() {
         <div className="lg:col-span-2 bg-surface-container-lowest p-8 rounded-xl shadow-sm overflow-hidden relative">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-xl font-headline font-extrabold text-primary">Route Profitability</h3>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <ChangeBadge value={stats.routeChange} />
               <span className="text-xs font-bold text-secondary bg-secondary-container px-3 py-1 rounded-full">
                 {(() => {
                   const routeMap = {};
