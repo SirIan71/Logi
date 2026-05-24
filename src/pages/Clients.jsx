@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
+import { usePermission } from '../hooks/usePermission';
 import { formatCurrency, searchFilter, generateId, exportToCSV } from '../utils/helpers';
 import StatusBadge from '../components/common/StatusBadge';
 import Modal from '../components/common/Modal';
@@ -7,6 +8,7 @@ import { Plus, Search, Download, Edit2, Trash2, Eye } from 'lucide-react';
 
 export default function Clients() {
   const { clients, trips, income, expenses, lookup, addItem, updateItem, deleteItem } = useApp();
+  const { canEdit } = usePermission('clients');
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(null);
   const [selected, setSelected] = useState(null);
@@ -41,7 +43,7 @@ export default function Clients() {
             { label: 'Revenue', accessor: r => r.totalRevenue }, { label: 'Outstanding', accessor: r => r.outstanding },
             { label: 'Trips', accessor: r => r.tripCount }, { label: 'Status', accessor: r => r.status },
           ])}><Download size={16}/> Export</button>
-          <button className="btn btn-primary" onClick={openAdd}><Plus size={16}/> Add Client</button>
+          {canEdit && <button className="btn btn-primary" onClick={openAdd}><Plus size={16}/> Add Client</button>}
         </div>
       </div>
 
@@ -63,8 +65,8 @@ export default function Clients() {
                 <td><StatusBadge status={c.status}/></td>
                 <td><div style={{display:'flex',gap:4}}>
                   <button className="btn-icon" onClick={()=>openView(c)}><Eye size={16}/></button>
-                  <button className="btn-icon" onClick={()=>openEdit(c)}><Edit2 size={16}/></button>
-                  <button className="btn-icon" onClick={()=>deleteItem('clients',c.id)}><Trash2 size={16}/></button>
+                  {canEdit && <button className="btn-icon" onClick={()=>openEdit(c)}><Edit2 size={16}/></button>}
+                  {canEdit && <button className="btn-icon" onClick={()=>deleteItem('clients',c.id)}><Trash2 size={16}/></button>}
                 </div></td>
               </tr>
             ))}</tbody>

@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
+import { usePermission } from '../hooks/usePermission';
 import { formatDate, searchFilter, generateId, exportToCSV } from '../utils/helpers';
 import StatusBadge from '../components/common/StatusBadge';
 import Modal from '../components/common/Modal';
@@ -9,6 +10,7 @@ const statuses = ['all', 'scheduled', 'in_progress', 'completed', 'delayed', 'ca
 
 export default function Trips() {
   const { trips, routes, vehicles, clients, lookup, addItem, updateItem, deleteItem } = useApp();
+  const { canEdit, isOwnOnly, user } = usePermission('trips');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [modal, setModal] = useState(null); // 'add' | 'edit' | 'view' | null
@@ -17,11 +19,17 @@ export default function Trips() {
 
   const drivers = useApp().users.filter(u => u.role === 'driver');
 
+  // Drivers only see their own assigned trips
+  const visibleTrips = useMemo(() => {
+    if (isOwnOnly) return trips.filter(t => t.driver_id === user?.id);
+    return trips;
+  }, [trips, isOwnOnly, user]);
+
   const filtered = useMemo(() => {
-    let data = statusFilter === 'all' ? trips : trips.filter(t => t.status === statusFilter);
+    let data = statusFilter === 'all' ? visibleTrips : visibleTrips.filter(t => t.status === statusFilter);
     return searchFilter(data, search, ['origin', 'destination', 'cargo_type', 'status'])
       .sort((a, b) => new Date(b.departure_date) - new Date(a.departure_date));
-  }, [trips, search, statusFilter]);
+  }, [visibleTrips, search, statusFilter]);
 
   const openAdd = () => { setForm({ status: 'scheduled', departure_date: new Date().toISOString().split('T')[0] }); setModal('add'); };
   const openEdit = (t) => { setForm({ ...t }); setSelected(t); setModal('edit'); };
@@ -92,14 +100,14 @@ export default function Trips() {
         <h1>Trips</h1>
         <div className="page-header-actions">
           <button className="btn btn-secondary" onClick={handleExport}><Download size={16}/> Export</button>
-          <button className="btn btn-primary" onClick={openAdd}><Plus size={16}/> New Trip</button>
+          {canEdit && <button className="btn btn-primary" onClick={openAdd}><Plus size={16}/> New Trip</button>}
         </div>
       </div>
 
       <div className="tabs">
         {statuses.map(s => (
           <button key={s} className={`tab${statusFilter===s?' active':''}`} onClick={() => setStatusFilter(s)}>
-            {s === 'all' ? `All (${trips.length})` : `${s.replace(/_/g,' ')} (${trips.filter(t=>t.status===s).length})`}
+            {s === 'all' ? `All (${visibleTrips.length})` : `${s.replace(/_/g,' ')} (${visibleTrips.filter(t=>t.status===s).length})`}
           </button>
         ))}
       </div>
@@ -130,8 +138,8 @@ export default function Trips() {
                     <td>
                       <div style={{display:'flex',gap:4}}>
                         <button className="btn-icon" onClick={() => openView(t)} title="View"><Eye size={16}/></button>
-                        <button className="btn-icon" onClick={() => openEdit(t)} title="Edit"><Edit2 size={16}/></button>
-                        <button className="btn-icon" onClick={() => handleDelete(t.id)} title="Delete"><Trash2 size={16}/></button>
+                        {canEdit && <button className="btn-icon" onClick={() => openEdit(t)} title="Edit"><Edit2 size={16}/></button>}
+                        {canEdit && <button className="btn-icon" onClick={() => handleDelete(t.id)} title="Delete"><Trash2 size={16}/></button>}
                       </div>
                     </td>
                   </tr>
@@ -140,7 +148,7 @@ export default function Trips() {
             </tbody>
           </table>
         </div>
-        <div className="table-footer"><span>{filtered.length} of {trips.length} trips</span></div>
+        <div className="table-footer"><span>{filtered.length} of {visibleTrips.length} trips</span></div>
       </div>
 
       {(modal === 'add' || modal === 'edit') && (

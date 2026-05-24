@@ -1,10 +1,10 @@
 // SIRIAN Mock Data
 const drivers = [
-  { id: 'd1', name: 'James Moyo', email: 'james@sirian.co', phone: '+27 71 234 5678', role: 'driver', is_active: true },
-  { id: 'd2', name: 'Sipho Ndlovu', email: 'sipho@sirian.co', phone: '+27 72 345 6789', role: 'driver', is_active: true },
-  { id: 'd3', name: 'Peter Mabena', email: 'peter@sirian.co', phone: '+27 73 456 7890', role: 'driver', is_active: true },
-  { id: 'd4', name: 'Thabo Dlamini', email: 'thabo@sirian.co', phone: '+27 74 567 8901', role: 'driver', is_active: true },
-  { id: 'd5', name: 'Bongani Khumalo', email: 'bongani@sirian.co', phone: '+27 75 678 9012', role: 'driver', is_active: false },
+  { id: 'd1', name: 'James Moyo', email: 'james@sirian.co', phone: '+27 71 234 5678', role: 'driver', is_active: true, password: 'admin123' },
+  { id: 'd2', name: 'Sipho Ndlovu', email: 'sipho@sirian.co', phone: '+27 72 345 6789', role: 'driver', is_active: true, password: 'driver123' },
+  { id: 'd3', name: 'Peter Mabena', email: 'peter@sirian.co', phone: '+27 73 456 7890', role: 'driver', is_active: true, password: 'driver123' },
+  { id: 'd4', name: 'Thabo Dlamini', email: 'thabo@sirian.co', phone: '+27 74 567 8901', role: 'driver', is_active: true, password: 'driver123' },
+  { id: 'd5', name: 'Bongani Khumalo', email: 'bongani@sirian.co', phone: '+27 75 678 9012', role: 'driver', is_active: false, password: 'driver123' },
 ];
 
 const users = [

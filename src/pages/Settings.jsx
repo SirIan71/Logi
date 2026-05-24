@@ -1,25 +1,32 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { usePermission } from '../hooks/usePermission';
 import { Shield, Users, Database, Palette, Bell, Check, X } from 'lucide-react';
 import { generateId } from '../utils/helpers';
 
 export default function Settings() {
   const { user, users, updateItem } = useApp();
-  const [activeTab, setActiveTab] = useState('User Management');
+  const { role } = usePermission('settings');
+  const isAdmin = role === 'admin';
+
+  // Build sections list based on role
+  const allSections = [
+    { icon: Users, title: 'User Management', desc: 'Manage users, roles, and permissions', badge: 'Admin Only', adminOnly: true },
+    { icon: Database, title: 'Data Management', desc: 'Backup, export, and import company data', badge: null, adminOnly: true },
+    { icon: Palette, title: 'Appearance', desc: 'Theme, language, and display preferences', badge: null, adminOnly: false },
+    { icon: Bell, title: 'Notifications', desc: 'Configure email and telegram notifications', badge: null, adminOnly: false },
+    { icon: Shield, title: 'Security', desc: 'Password policies, 2FA, and session management', badge: null, adminOnly: true },
+  ];
+
+  const sections = isAdmin ? allSections : allSections.filter(s => !s.adminOnly);
+
+  const [activeTab, setActiveTab] = useState(sections[0]?.title || 'Appearance');
   const [theme, setTheme] = useState('lighttheme');
   const [emailNotif, setEmailNotif] = useState(true);
   const [teleNotif, setTeleNotif] = useState(false);
   const [teleId, setTeleId] = useState('');
   const [passwordMinLength, setPasswordMinLength] = useState(8);
   const [requireSpecialChar, setRequireSpecialChar] = useState(true);
-
-  const sections = [
-    { icon: Users, title: 'User Management', desc: 'Manage users, roles, and permissions', badge: 'Admin Only' },
-    { icon: Database, title: 'Data Management', desc: 'Backup, export, and import company data', badge: null },
-    { icon: Palette, title: 'Appearance', desc: 'Theme, language, and display preferences', badge: null },
-    { icon: Bell, title: 'Notifications', desc: 'Configure email and telegram notifications', badge: null },
-    { icon: Shield, title: 'Security', desc: 'Password policies, 2FA, and session management', badge: null },
-  ];
 
   const handleRoleChange = (userId, newRole) => {
     const u = users.find(x => x.id === userId);
@@ -100,7 +107,7 @@ export default function Settings() {
             </div>
           )}
 
-          {activeTab === 'Security' && (
+          {activeTab === 'Security' && isAdmin && (
             <div className="form-grid" style={{maxWidth: 500}}>
               <div className="form-group full">
                 <label className="form-label">Minimum Password Length</label>
@@ -116,7 +123,7 @@ export default function Settings() {
             </div>
           )}
 
-          {activeTab === 'User Management' && (
+          {activeTab === 'User Management' && isAdmin && (
             <div>
               <table className="data-table" style={{width:'100%'}}>
                 <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th></tr></thead>
@@ -141,7 +148,7 @@ export default function Settings() {
             </div>
           )}
 
-          {activeTab === 'Data Management' && (
+          {activeTab === 'Data Management' && isAdmin && (
              <div className="form-grid" style={{maxWidth: 500}}>
                <p className="text-secondary mb-4" style={{gridColumn:'1/-1'}}>Export or backup your entire operational logic and datasets.</p>
                <button className="btn btn-secondary">Backup System Data</button>

@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
+import { usePermission } from '../hooks/usePermission';
 import { formatCurrency, formatDate, formatNumber, searchFilter, generateId, exportToCSV } from '../utils/helpers';
 import { useFuelPrices } from '../utils/useFuelPrices';
 import Modal from '../components/common/Modal';
@@ -12,6 +13,7 @@ const chartOpts = { responsive: true, maintainAspectRatio: false, plugins: { leg
 
 export default function Fuel() {
   const { fuelRecords, vehicles, trips, lookup, addItem, updateItem, deleteItem } = useApp();
+  const { canEdit, isOwnOnly, isReadOnly, user } = usePermission('fuel');
   const drivers = useApp().users.filter(u => u.role === 'driver');
   const { prices: fuelPrices, loading: pricesLoading, refresh: refreshPrices, updateRates } = useFuelPrices();
   const [search, setSearch] = useState('');
@@ -20,18 +22,24 @@ export default function Fuel() {
   const [form, setForm] = useState({});
   const [rateForm, setRateForm] = useState({});
 
+  // Drivers only see their own fuel records
+  const visibleRecords = useMemo(() => {
+    if (isOwnOnly) return fuelRecords.filter(f => f.recorded_by === user?.id);
+    return fuelRecords;
+  }, [fuelRecords, isOwnOnly, user]);
+
   const filtered = useMemo(() => {
-    let data = vehicleFilter === 'all' ? fuelRecords : fuelRecords.filter(f => f.vehicle_id === vehicleFilter);
+    let data = vehicleFilter === 'all' ? visibleRecords : visibleRecords.filter(f => f.vehicle_id === vehicleFilter);
     return searchFilter(data, search, ['station'])
       .sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [fuelRecords, search, vehicleFilter]);
+  }, [visibleRecords, search, vehicleFilter]);
 
   const totals = useMemo(() => {
-    const totalLiters = fuelRecords.reduce((s, f) => s + f.liters, 0);
-    const totalCost = fuelRecords.reduce((s, f) => s + f.cost, 0);
+    const totalLiters = visibleRecords.reduce((s, f) => s + f.liters, 0);
+    const totalCost = visibleRecords.reduce((s, f) => s + f.cost, 0);
     const avgPricePerLiter = totalCost / (totalLiters || 1);
-    return { totalLiters, totalCost, avgPricePerLiter, records: fuelRecords.length };
-  }, [fuelRecords]);
+    return { totalLiters, totalCost, avgPricePerLiter, records: visibleRecords.length };
+  }, [visibleRecords]);
 
   // Efficiency per vehicle
   const efficiency = useMemo(() => {
@@ -127,7 +135,7 @@ export default function Fuel() {
             { label: 'Liters', accessor: r => r.liters }, { label: 'Cost', accessor: r => r.cost },
             { label: 'Odometer', accessor: r => r.odometer_reading }, { label: 'Station', accessor: r => r.station },
           ])}><Download size={16}/> Export</button>
-          <button className="btn btn-primary" onClick={openAdd}><Plus size={16}/> Record Fuel</button>
+          {(canEdit || isOwnOnly) && <button className="btn btn-primary" onClick={openAdd}><Plus size={16}/> Record Fuel</button>}
         </div>
       </div>
 
@@ -173,13 +181,13 @@ export default function Fuel() {
             >
               <RefreshCw size={16} style={{ animation: pricesLoading ? 'spin 1s linear infinite' : 'none' }} />
             </button>
-            <button
+            {canEdit && <button
               className="btn btn-secondary"
               onClick={openRateUpdate}
               style={{ fontSize: 11, padding: '4px 12px' }}
             >
               Update Rates
-            </button>
+            </button>}
           </div>
         </div>
 
@@ -277,8 +285,9 @@ export default function Fuel() {
                   <td>{f.station}</td>
                   <td>{trip?`${trip.origin}→${trip.destination}`:'—'}</td>
                   <td><div style={{display:'flex',gap:4}}>
-                    <button className="btn-icon" onClick={()=>openEdit(f)}><Edit2 size={16}/></button>
-                    <button className="btn-icon" onClick={()=>deleteItem('fuelRecords',f.id)}><Trash2 size={16}/></button>
+                    {canEdit && <button className="btn-icon" onClick={()=>openEdit(f)}><Edit2 size={16}/></button>}
+                    {canEdit && <button className="btn-icon" onClick={()=>deleteItem('fuelRecords',f.id)}><Trash2 size={16}/></button>}
+                    {!canEdit && !isOwnOnly && <span style={{fontSize:11,color:'var(--text-muted)'}}>View only</span>}
                   </div></td>
                 </tr>
               ); })

@@ -1,9 +1,209 @@
 import { useMemo } from 'react';
 import { useApp } from '../context/AppContext';
-import { formatCurrency, getTripProfitability } from '../utils/helpers';
+import { usePermission } from '../hooks/usePermission';
+import { formatCurrency, formatNumber, formatDate, getTripProfitability } from '../utils/helpers';
+import StatusBadge from '../components/common/StatusBadge';
 
+// ── Driver-Specific Personal Dashboard ────────────────────────────────────────
+function DriverDashboard() {
+  const { trips, fuelRecords, vehicles, lookup, user } = useApp();
+
+  const myTrips = useMemo(() =>
+    trips.filter(t => t.driver_id === user?.id)
+      .sort((a, b) => new Date(b.departure_date) - new Date(a.departure_date)),
+    [trips, user]
+  );
+
+  const myFuel = useMemo(() =>
+    fuelRecords.filter(f => f.recorded_by === user?.id),
+    [fuelRecords, user]
+  );
+
+  const myVehicle = useMemo(() =>
+    vehicles.find(v => v.assigned_driver_id === user?.id),
+    [vehicles, user]
+  );
+
+  const tripStats = useMemo(() => ({
+    total: myTrips.length,
+    completed: myTrips.filter(t => t.status === 'completed').length,
+    inProgress: myTrips.filter(t => t.status === 'in_progress').length,
+    scheduled: myTrips.filter(t => t.status === 'scheduled').length,
+    delayed: myTrips.filter(t => t.status === 'delayed').length,
+  }), [myTrips]);
+
+  const fuelStats = useMemo(() => ({
+    totalLiters: myFuel.reduce((s, f) => s + f.liters, 0),
+    totalCost: myFuel.reduce((s, f) => s + f.cost, 0),
+    records: myFuel.length,
+  }), [myFuel]);
+
+  const totalDistance = useMemo(() =>
+    myTrips.filter(t => t.status === 'completed')
+      .reduce((s, t) => s + (t.actual_distance_km || t.estimated_distance_km || 0), 0),
+    [myTrips]
+  );
+
+  return (
+    <>
+      <div className="flex justify-between items-end">
+        <div>
+          <h2 className="text-3xl font-headline font-extrabold text-primary">Welcome, {user?.name?.split(' ')[0]}</h2>
+          <p className="text-on-surface-variant font-body">Your personal driver dashboard.</p>
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-surface-container-lowest p-6 rounded-xl shadow-sm border border-transparent hover:border-outline-variant/20 transition-all">
+          <div className="flex justify-between items-start mb-4">
+            <div className="p-2 bg-primary/5 rounded-lg">
+              <span className="material-symbols-outlined text-primary">route</span>
+            </div>
+            <span className="text-xs font-bold px-2 py-1 rounded-full text-secondary bg-secondary-container">
+              {tripStats.inProgress} active
+            </span>
+          </div>
+          <p className="text-sm text-on-surface-variant font-medium">Total Trips</p>
+          <h3 className="text-2xl font-headline font-extrabold text-primary mt-1">{tripStats.total}</h3>
+        </div>
+
+        <div className="bg-surface-container-lowest p-6 rounded-xl shadow-sm border border-transparent hover:border-outline-variant/20 transition-all">
+          <div className="flex justify-between items-start mb-4">
+            <div className="p-2 bg-primary/5 rounded-lg">
+              <span className="material-symbols-outlined text-primary">check_circle</span>
+            </div>
+          </div>
+          <p className="text-sm text-on-surface-variant font-medium">Completed Trips</p>
+          <h3 className="text-2xl font-headline font-extrabold text-primary mt-1">{tripStats.completed}</h3>
+        </div>
+
+        <div className="bg-surface-container-lowest p-6 rounded-xl shadow-sm border border-transparent hover:border-outline-variant/20 transition-all">
+          <div className="flex justify-between items-start mb-4">
+            <div className="p-2 bg-primary/5 rounded-lg">
+              <span className="material-symbols-outlined text-primary">local_gas_station</span>
+            </div>
+          </div>
+          <p className="text-sm text-on-surface-variant font-medium">Fuel Logged</p>
+          <h3 className="text-2xl font-headline font-extrabold text-primary mt-1">{formatNumber(fuelStats.totalLiters)} L</h3>
+        </div>
+
+        <div className="bg-primary p-6 rounded-xl shadow-md relative overflow-hidden">
+          <div className="relative z-10">
+            <div className="flex justify-between items-start mb-4">
+              <div className="p-2 bg-white/10 rounded-lg">
+                <span className="material-symbols-outlined text-secondary-fixed">speed</span>
+              </div>
+            </div>
+            <p className="text-sm text-white/70 font-medium">Distance Covered</p>
+            <h3 className="text-2xl font-headline font-extrabold text-white mt-1">{formatNumber(totalDistance)} km</h3>
+          </div>
+          <div className="absolute -right-4 -bottom-4 opacity-10">
+            <span className="material-symbols-outlined text-[120px]">directions_car</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Assigned Vehicle Card */}
+        <div className="bg-surface-container-low p-6 rounded-xl">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center">
+              <span className="material-symbols-outlined text-primary">local_shipping</span>
+            </div>
+            <div>
+              <p className="text-xs font-bold text-outline uppercase tracking-wider">Assigned Vehicle</p>
+              <h4 className="text-xl font-headline font-bold text-primary">{myVehicle?.registration || 'Unassigned'}</h4>
+            </div>
+          </div>
+          {myVehicle ? (
+            <div className="space-y-3">
+              <div className="flex justify-between"><span className="text-sm text-on-surface-variant">Make/Model</span><span className="text-sm font-bold text-primary">{myVehicle.make} {myVehicle.model}</span></div>
+              <div className="flex justify-between"><span className="text-sm text-on-surface-variant">Year</span><span className="text-sm font-bold text-primary">{myVehicle.year}</span></div>
+              <div className="flex justify-between"><span className="text-sm text-on-surface-variant">Capacity</span><span className="text-sm font-bold text-primary">{myVehicle.capacity_tons}t</span></div>
+              <div className="flex justify-between"><span className="text-sm text-on-surface-variant">Odometer</span><span className="text-sm font-bold text-primary">{formatNumber(myVehicle.current_odometer)} km</span></div>
+              <div className="flex justify-between"><span className="text-sm text-on-surface-variant">Status</span><span className={`text-sm font-bold ${myVehicle.status === 'active' ? 'text-secondary' : 'text-error'}`}>{myVehicle.status}</span></div>
+            </div>
+          ) : (
+            <p className="text-sm text-outline">No vehicle currently assigned to you.</p>
+          )}
+        </div>
+
+        {/* Recent Trips */}
+        <div className="lg:col-span-2 bg-surface-container-lowest p-6 rounded-xl shadow-sm">
+          <h3 className="text-xl font-headline font-extrabold text-primary mb-4">Recent Trips</h3>
+          <div style={{overflowX:'auto'}}>
+            <table className="data-table" style={{width:'100%'}}>
+              <thead><tr><th>Route</th><th>Client</th><th>Cargo</th><th>Date</th><th>Status</th></tr></thead>
+              <tbody>
+                {myTrips.length === 0 ? (
+                  <tr><td colSpan={5} className="table-empty">No trips assigned yet</td></tr>
+                ) : myTrips.slice(0, 7).map(t => (
+                  <tr key={t.id}>
+                    <td className="primary">{t.origin} → {t.destination}</td>
+                    <td>{lookup('clients', t.client_id)?.company_name || '—'}</td>
+                    <td>{t.cargo_type}</td>
+                    <td>{formatDate(t.departure_date)}</td>
+                    <td><StatusBadge status={t.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Fuel Usage Summary */}
+      <div className="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
+        <h3 className="text-xl font-headline font-extrabold text-primary mb-4">My Fuel Log</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="bg-surface-container-low p-4 rounded-lg text-center">
+            <p className="text-xs font-bold text-outline uppercase tracking-wider mb-1">Total Records</p>
+            <p className="text-2xl font-headline font-extrabold text-primary">{fuelStats.records}</p>
+          </div>
+          <div className="bg-surface-container-low p-4 rounded-lg text-center">
+            <p className="text-xs font-bold text-outline uppercase tracking-wider mb-1">Total Liters</p>
+            <p className="text-2xl font-headline font-extrabold text-primary">{formatNumber(fuelStats.totalLiters)} L</p>
+          </div>
+          <div className="bg-surface-container-low p-4 rounded-lg text-center">
+            <p className="text-xs font-bold text-outline uppercase tracking-wider mb-1">Total Cost</p>
+            <p className="text-2xl font-headline font-extrabold text-primary">{formatCurrency(fuelStats.totalCost)}</p>
+          </div>
+        </div>
+        <div style={{overflowX:'auto'}}>
+          <table className="data-table" style={{width:'100%'}}>
+            <thead><tr><th>Date</th><th>Vehicle</th><th>Liters</th><th>Cost</th><th>Station</th><th>Trip</th></tr></thead>
+            <tbody>
+              {myFuel.length === 0 ? (
+                <tr><td colSpan={6} className="table-empty">No fuel records logged</td></tr>
+              ) : myFuel.sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 5).map(f => {
+                const trip = lookup('trips', f.trip_id);
+                return (
+                  <tr key={f.id}>
+                    <td>{formatDate(f.date)}</td>
+                    <td className="primary">{lookup('vehicles', f.vehicle_id)?.registration || '—'}</td>
+                    <td className="numeric">{formatNumber(f.liters)} L</td>
+                    <td className="numeric">{formatCurrency(f.cost)}</td>
+                    <td>{f.station}</td>
+                    <td>{trip ? `${trip.origin}→${trip.destination}` : '—'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Main Dashboard ────────────────────────────────────────────────────────────
 export default function Dashboard() {
-  const { trips, income, expenses, vehicles, clients, lookup } = useApp();
+  const { trips, income, expenses, vehicles, clients, lookup, user } = useApp();
+  const { isOwnOnly } = usePermission('dashboard');
+
+  // Driver gets their own personal dashboard
+  if (isOwnOnly) return <DriverDashboard />;
 
   const stats = useMemo(() => {
     const actualIncome = income.filter(i => i.payment_status === 'paid').reduce((s, i) => s + i.amount_paid, 0);
