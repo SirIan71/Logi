@@ -2,12 +2,14 @@ import { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { usePermission } from '../hooks/usePermission';
 import { formatCurrency, formatNumber, searchFilter, generateId, getTripProfitability, exportToCSV } from '../utils/helpers';
+import { useFuelPrices } from '../utils/useFuelPrices';
 import Modal from '../components/common/Modal';
 import { Plus, Search, Download, Edit2, Trash2, TrendingUp } from 'lucide-react';
 
 export default function Routes() {
-  const { routes, trips, income, expenses, lookup, addItem, updateItem, deleteItem } = useApp();
+  const { routes, trips, income, expenses, vehicles, lookup, addItem, updateItem, deleteItem } = useApp();
   const { canEdit, isOwnOnly, user } = usePermission('routes');
+  const { prices: fuelPrices } = useFuelPrices();
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState({});
@@ -37,7 +39,13 @@ export default function Routes() {
   const openAdd = () => { setForm({}); setModal('add'); };
   const openEdit = (r) => { setForm({ ...r }); setModal('edit'); };
   const closeModal = () => { setModal(null); setForm({}); };
-  const save = () => { const data = { ...form, distance_km: +form.distance_km || 0, estimated_fuel_liters: +form.estimated_fuel_liters || 0, estimated_tolls: +form.estimated_tolls || 0, estimated_duration_hours: +form.estimated_duration_hours || 0 }; if (modal === 'add') addItem('routes', { ...data, id: generateId('r') }); else updateItem('routes', data); closeModal(); };
+  const save = () => { 
+    const data = { ...form, distance_km: +form.distance_km || 0, estimated_fuel_liters: +form.estimated_fuel_liters || 0, estimated_fuel_cost: +form.estimated_fuel_cost || 0, estimated_tolls: +form.estimated_tolls || 0, estimated_duration_hours: +form.estimated_duration_hours || 0 }; 
+
+    if (modal === 'add') addItem('routes', { ...data, id: generateId('r') }); 
+    else updateItem('routes', data); 
+    closeModal(); 
+  };
 
   const csvColumns = [
     { label: 'Name', accessor: r => r.name },
@@ -59,13 +67,16 @@ export default function Routes() {
         <div className="table-toolbar"><div className="table-toolbar-left"><div className="search-input"><Search size={15}/><input placeholder="Search routes..." value={search} onChange={e=>setSearch(e.target.value)}/></div></div></div>
         <div style={{overflowX:'auto'}}>
           <table className="data-table">
-            <thead><tr><th>Route</th><th>Distance</th><th>Est. Fuel</th>{showFinancials && <th>Est. Tolls</th>}<th>Duration</th><th>Trips</th>{showFinancials && <><th>Total Profit</th><th>Avg Profit/Trip</th></>}<th>Actions</th></tr></thead>
+            <thead><tr><th>Route</th><th>Distance</th><th>Est. Fuel</th>{showFinancials && <><th>Est. Fuel Cost</th><th>Est. Tolls</th></>}<th>Duration</th><th>Trips</th>{showFinancials && <><th>Total Profit</th><th>Avg Profit/Trip</th></>}<th>Actions</th></tr></thead>
             <tbody>{filtered.map(r => (
               <tr key={r.id}>
                 <td className="primary">{r.name}</td>
                 <td className="numeric">{formatNumber(r.distance_km)} km</td>
                 <td className="numeric">{formatNumber(r.estimated_fuel_liters)} L</td>
-                {showFinancials && <td className="numeric">{formatCurrency(r.estimated_tolls)}</td>}
+                {showFinancials && <>
+                  <td className="numeric">{formatCurrency(r.estimated_fuel_cost || (r.estimated_fuel_liters * (fuelPrices?.diesel || 0)))}</td>
+                  <td className="numeric">{formatCurrency(r.estimated_tolls)}</td>
+                </>}
                 <td>{r.estimated_duration_hours}h</td>
                 <td className="numeric">{r.tripCount}</td>
                 {showFinancials && <>
@@ -90,9 +101,33 @@ export default function Routes() {
           <div className="form-group full"><label className="form-label">Route Name</label><input className="form-input" value={form.name||''} onChange={e=>setForm({...form,name:e.target.value})} placeholder="e.g. JHB → Durban" /></div>
           <div className="form-group"><label className="form-label">Origin</label><input className="form-input" value={form.origin||''} onChange={e=>setForm({...form,origin:e.target.value})}/></div>
           <div className="form-group"><label className="form-label">Destination</label><input className="form-input" value={form.destination||''} onChange={e=>setForm({...form,destination:e.target.value})}/></div>
-          <div className="form-group"><label className="form-label">Distance (km)</label><input className="form-input" type="number" value={form.distance_km||''} onChange={e=>setForm({...form,distance_km:e.target.value})}/></div>
-          <div className="form-group"><label className="form-label">Est. Fuel (L)</label><input className="form-input" type="number" value={form.estimated_fuel_liters||''} onChange={e=>setForm({...form,estimated_fuel_liters:e.target.value})}/></div>
-          <div className="form-group"><label className="form-label">Est. Tolls (R)</label><input className="form-input" type="number" value={form.estimated_tolls||''} onChange={e=>setForm({...form,estimated_tolls:e.target.value})}/></div>
+          <div className="form-group"><label className="form-label">Distance (km)</label><input className="form-input" type="number" value={form.distance_km||''} onChange={e=>{
+            const dist = +e.target.value;
+            const updates = { distance_km: e.target.value };
+            if (form.consumption_rate) {
+              updates.estimated_fuel_liters = (dist / 100) * form.consumption_rate;
+              updates.estimated_fuel_cost = updates.estimated_fuel_liters * (fuelPrices?.diesel || 0);
+            }
+            setForm({...form, ...updates});
+          }}/></div>
+          <div className="form-group"><label className="form-label">Ref. Vehicle (Calc)</label><select className="form-select" value={form.calc_vehicle_id||''} onChange={e=>{
+            const vid = e.target.value;
+            const v = vehicles.find(x => x.id === vid);
+            const rate = v?.avg_consumption_rate || 0;
+            const dist = form.distance_km || 0;
+            const updates = { calc_vehicle_id: vid, consumption_rate: rate };
+            if (rate && dist) {
+              updates.estimated_fuel_liters = (dist / 100) * rate;
+              updates.estimated_fuel_cost = updates.estimated_fuel_liters * (fuelPrices?.diesel || 0);
+            }
+            setForm({...form, ...updates});
+          }}><option value="">Select vehicle...</option>{vehicles.map(v=><option key={v.id} value={v.id}>{v.registration} ({v.avg_consumption_rate?v.avg_consumption_rate+' L/100km':'No rate'})</option>)}</select></div>
+          <div className="form-group"><label className="form-label">Est. Fuel (L)</label><input className="form-input" type="number" value={form.estimated_fuel_liters||''} onChange={e=>{
+            const fuel = +e.target.value;
+            setForm({...form,estimated_fuel_liters:e.target.value, estimated_fuel_cost: fuel * (fuelPrices?.diesel || 0)});
+          }}/></div>
+          <div className="form-group"><label className="form-label">Est. Fuel Cost</label><input className="form-input" type="number" value={form.estimated_fuel_cost||''} onChange={e=>setForm({...form,estimated_fuel_cost:e.target.value})}/></div>
+          <div className="form-group"><label className="form-label">Est. Tolls</label><input className="form-input" type="number" value={form.estimated_tolls||''} onChange={e=>setForm({...form,estimated_tolls:e.target.value})}/></div>
           <div className="form-group"><label className="form-label">Est. Duration (hrs)</label><input className="form-input" type="number" value={form.estimated_duration_hours||''} onChange={e=>setForm({...form,estimated_duration_hours:e.target.value})}/></div>
           <div className="form-group full"><label className="form-label">Notes</label><textarea className="form-textarea" value={form.notes||''} onChange={e=>setForm({...form,notes:e.target.value})}/></div>
         </div>

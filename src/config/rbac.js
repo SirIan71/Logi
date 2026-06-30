@@ -97,11 +97,11 @@ const ALL_NAV_ITEMS = [
   // Overview
   { path: '/', label: 'Dashboard', icon: 'dashboard', group: 'Overview', page: 'dashboard' },
   // Operations
-  { path: '/trips', label: 'Trips', icon: 'route', group: 'Operations', page: 'trips' },
+  { path: '/clients', label: 'Clients', icon: 'group', group: 'Operations', page: 'clients' },
   { path: '/routes', label: 'Routes', icon: 'map', group: 'Operations', page: 'routes' },
+  { path: '/trips', label: 'Trips', icon: 'route', group: 'Operations', page: 'trips' },
   { path: '/fleet', label: 'Fleet', icon: 'local_shipping', group: 'Operations', page: 'fleet' },
   { path: '/drivers', label: 'Drivers', icon: 'badge', group: 'Operations', page: 'drivers' },
-  { path: '/clients', label: 'Clients', icon: 'group', group: 'Operations', page: 'clients' },
   // Finance
   { path: '/income', label: 'Income', icon: 'payments', group: 'Finance', page: 'income' },
   { path: '/fuel', label: 'Fuel', icon: 'gas_meter', group: 'Finance', page: 'fuel' },

@@ -22,7 +22,7 @@ const REFRESH_INTERVAL_MS = 60 * 1000; // Check every 60 seconds if midnight has
 // Update these when EPRA publishes new rates (typically around the 14th of each month)
 const EPRA_RATES = {
   super_petrol: 214.25,
-  diesel: 232.86,
+  diesel: 221.57,
   kerosene: 191.38,
   effective_from: '2026-05-19',
   effective_to: '2026-06-14',

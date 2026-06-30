@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { usePermission } from '../hooks/usePermission';
 import { formatDate, searchFilter, generateId, exportToCSV } from '../utils/helpers';
+import { useFuelPrices } from '../utils/useFuelPrices';
 import StatusBadge from '../components/common/StatusBadge';
 import Modal from '../components/common/Modal';
 import { Plus, Search, Download, Eye, Edit2, Trash2 } from 'lucide-react';
@@ -9,8 +10,9 @@ import { Plus, Search, Download, Eye, Edit2, Trash2 } from 'lucide-react';
 const statuses = ['all', 'scheduled', 'in_progress', 'completed', 'delayed', 'cancelled'];
 
 export default function Trips() {
-  const { trips, routes, vehicles, clients, lookup, addItem, updateItem, deleteItem } = useApp();
+  const { trips, routes, vehicles, clients, fuelRecords, lookup, addItem, updateItem, deleteItem } = useApp();
   const { canEdit, isOwnOnly, user } = usePermission('trips');
+  const { prices: fuelPrices } = useFuelPrices();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [modal, setModal] = useState(null); // 'add' | 'edit' | 'view' | null
@@ -37,11 +39,40 @@ export default function Trips() {
   const closeModal = () => { setModal(null); setSelected(null); setForm({}); };
 
   const saveTrip = () => {
+    let tripId = form.id;
     if (modal === 'add') {
-      addItem('trips', { ...form, id: generateId('t') });
+      tripId = generateId('t');
+      addItem('trips', { ...form, id: tripId });
     } else {
       updateItem('trips', form);
     }
+
+    if (form.status === 'completed' && form.vehicle_id && form.route_id) {
+      // Check if a fuel record for this trip already exists
+      const existing = fuelRecords?.find(f => f.trip_id === tripId && String(f.station).startsWith('Est:'));
+      if (!existing) {
+        const r = lookup('routes', form.route_id);
+        const v = lookup('vehicles', form.vehicle_id);
+        const dist = form.actual_distance_km || form.estimated_distance_km || r?.distance_km || 0;
+        const rate = v?.avg_consumption_rate || 0;
+        const fuel = rate ? (dist / 100) * rate : (r?.estimated_fuel_liters || 0);
+        
+        if (fuel > 0) {
+          addItem('fuelRecords', {
+            id: generateId('f'),
+            vehicle_id: form.vehicle_id,
+            trip_id: tripId,
+            liters: fuel,
+            cost: fuel * (fuelPrices?.diesel || 0),
+            date: new Date().toISOString().split('T')[0],
+            station: `Est: Trip ${form.origin} → ${form.destination}`,
+            odometer_reading: v?.current_odometer || 0,
+            recorded_by: user?.id
+          });
+        }
+      }
+    }
+
     closeModal();
   };
 
