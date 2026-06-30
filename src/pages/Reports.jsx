@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { formatCurrency, formatNumber, getTripProfitability } from '../utils/helpers';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Filler, Tooltip, Legend } from 'chart.js';
 import { Bar, Doughnut } from 'react-chartjs-2';
-import { FileText, TrendingUp, Truck, Users, MapPin, Fuel } from 'lucide-react';
+import { FileText, TrendingUp, Truck, Users, MapPin, Fuel, DollarSign } from 'lucide-react';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Filler, Tooltip, Legend);
 const chartOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1E293B', titleColor: '#F1F5F9', bodyColor: '#94A3B8', borderColor: '#334155', borderWidth: 1, cornerRadius: 8 }}, scales: { x: { grid: { color: '#1e293b44' }, ticks: { color: '#64748B' }}, y: { grid: { color: '#1e293b44' }, ticks: { color: '#64748B' }}}};
@@ -18,7 +18,7 @@ export default function Reports() {
     trips.filter(t => t.status === 'completed').forEach(t => {
       const r = lookup('routes', t.route_id);
       const name = r?.name || 'Unknown';
-      const p = getTripProfitability(t, income, expenses);
+      const p = getTripProfitability(t, income, expenses, clients);
       if (!data[name]) data[name] = { income: 0, expenses: 0 };
       data[name].income += p.income;
       data[name].expenses += p.expenses;
@@ -63,8 +63,29 @@ export default function Reports() {
   // Driver activity (using data from context)
   const driverActivity = useMemo(() => null, []);
 
+  // Income breakdown by client
+  const incomeBreakdown = useMemo(() => {
+    const data = {};
+    income.forEach(i => {
+      const client = lookup('clients', i.client_id);
+      const name = client?.company_name || 'Other';
+      if (!data[name]) data[name] = { amount: 0, paid: 0 };
+      data[name].amount += i.amount;
+      data[name].paid += i.amount_paid;
+    });
+    const entries = Object.entries(data).sort((a, b) => b[1].amount - a[1].amount);
+    return {
+      labels: entries.map(e => e[0]),
+      datasets: [
+        { label: 'Expected Income', data: entries.map(e => e[1].amount), backgroundColor: '#3B82F6', borderRadius: 6 },
+        { label: 'Received (Paid)', data: entries.map(e => e[1].paid), backgroundColor: '#10B981', borderRadius: 6 }
+      ]
+    };
+  }, [income, lookup]);
+
   const reports = [
     { id: 'profitability', icon: TrendingUp, label: 'Route Profitability' },
+    { id: 'income', icon: DollarSign, label: 'Income Analytics' },
     { id: 'expenses', icon: FileText, label: 'Expense Breakdown' },
     { id: 'vehicles', icon: Truck, label: 'Vehicle Utilization' },
     { id: 'fuel', icon: Fuel, label: 'Fuel Analysis' },
@@ -92,6 +113,23 @@ export default function Reports() {
               const inc = routeProfit.datasets[0].data[i];
               const exp = routeProfit.datasets[1].data[i];
               return <tr key={name}><td className="primary">{name}</td><td className="numeric positive">{formatCurrency(inc)}</td><td className="numeric negative">{formatCurrency(exp)}</td><td className="numeric" style={{color: inc-exp>=0?'var(--color-success)':'var(--color-danger)',fontWeight:700}}>{formatCurrency(inc-exp)}</td><td className="numeric">{inc > 0 ? ((inc-exp)/inc*100).toFixed(1) + '%' : '—'}</td></tr>;
+            })}</tbody>
+          </table>
+        </div>
+      </div>}
+
+      {report === 'income' && <div>
+        <div className="chart-card" style={{marginBottom:20}}>
+          <div className="chart-card-header"><span className="chart-card-title">Income by Client</span></div>
+          <div style={{height:350}}><Bar data={incomeBreakdown} options={{...chartOpts, plugins: {...chartOpts.plugins, legend: {display:true, labels:{color:'#94A3B8',usePointStyle:true,padding:16}}}}}/></div>
+        </div>
+        <div className="table-container">
+          <table className="data-table">
+            <thead><tr><th>Client</th><th>Expected Income</th><th>Received</th><th>Outstanding</th></tr></thead>
+            <tbody>{incomeBreakdown.labels.map((name, i) => {
+              const expected = incomeBreakdown.datasets[0].data[i];
+              const paid = incomeBreakdown.datasets[1].data[i];
+              return <tr key={name}><td className="primary">{name}</td><td className="numeric">{formatCurrency(expected)}</td><td className="numeric positive">{formatCurrency(paid)}</td><td className="numeric negative">{formatCurrency(expected - paid)}</td></tr>;
             })}</tbody>
           </table>
         </div>

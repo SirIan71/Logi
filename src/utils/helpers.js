@@ -59,12 +59,31 @@ export const exportToCSV = (data, filename, columns) => {
   URL.revokeObjectURL(url);
 };
 
-export const getTripProfitability = (trip, incomeData, expensesData) => {
+export const getTripProfitability = (trip, incomeData, expensesData, clientsData = []) => {
+  let tripIncome = 0;
+  let tripPaid = 0;
+
   const tripIncomes = incomeData.filter(i => i.trip_id === trip.id);
-  const tripIncome = tripIncomes.reduce((s, i) => s + i.amount, 0);
-  const tripPaid = tripIncomes.reduce((s, i) => s + (i.amount_paid || 0), 0);
+  const bulkInvoice = incomeData.find(i => i.trip_details && i.trip_details.some(td => td.trip_id === trip.id));
+
+  if (tripIncomes.length > 0) {
+    tripIncome = tripIncomes.reduce((s, i) => s + i.amount, 0);
+    tripPaid = tripIncomes.reduce((s, i) => s + (i.amount_paid || 0), 0);
+  } else if (bulkInvoice) {
+    const client = clientsData.find(c => c.id === trip.client_id);
+    if (client) {
+      tripIncome = client.rate_type === 'per_ton' ? (trip.cargo_weight_tons || 0) * (client.rate_amount || 0) : (client.rate_amount || 0);
+      tripPaid = bulkInvoice.amount > 0 ? tripIncome * (bulkInvoice.amount_paid / bulkInvoice.amount) : 0;
+    }
+  } else {
+    const client = clientsData.find(c => c.id === trip.client_id);
+    if (client) {
+      tripIncome = client.rate_type === 'per_ton' ? (trip.cargo_weight_tons || 0) * (client.rate_amount || 0) : (client.rate_amount || 0);
+    }
+  }
+
   const tripExpenses = expensesData.filter(e => e.trip_id === trip.id).reduce((s, e) => s + e.amount, 0);
-  const isPaid = tripIncomes.length > 0 && tripPaid >= tripIncome;
+  const isPaid = tripIncome > 0 && tripPaid >= tripIncome;
   return { income: tripIncome, expenses: tripExpenses, profit: tripIncome - tripExpenses, margin: tripIncome > 0 ? ((tripIncome - tripExpenses) / tripIncome * 100) : 0, isPaid };
 };
 

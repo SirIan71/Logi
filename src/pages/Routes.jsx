@@ -7,7 +7,7 @@ import Modal from '../components/common/Modal';
 import { Plus, Search, Download, Edit2, Trash2, TrendingUp } from 'lucide-react';
 
 export default function Routes() {
-  const { routes, trips, income, expenses, vehicles, lookup, addItem, updateItem, deleteItem } = useApp();
+  const { routes, trips, income, expenses, vehicles, clients, lookup, addItem, updateItem, deleteItem } = useApp();
   const { canEdit, isOwnOnly, user } = usePermission('routes');
   const { prices: fuelPrices } = useFuelPrices();
   const [search, setSearch] = useState('');
@@ -30,9 +30,9 @@ export default function Routes() {
     const routeTrips = trips.filter(t => t.route_id === r.id);
     const completed = routeTrips.filter(t => t.status === 'completed');
     let totalIncome = 0, totalExpenses = 0;
-    completed.forEach(t => { const p = getTripProfitability(t, income, expenses); totalIncome += p.income; totalExpenses += p.expenses; });
+    completed.forEach(t => { const p = getTripProfitability(t, income, expenses, clients); totalIncome += p.income; totalExpenses += p.expenses; });
     return { ...r, tripCount: routeTrips.length, completedCount: completed.length, totalIncome, totalExpenses, profit: totalIncome - totalExpenses, avgProfit: completed.length > 0 ? (totalIncome - totalExpenses) / completed.length : 0 };
-  }), [visibleRoutes, trips, income, expenses]);
+  }), [visibleRoutes, trips, income, expenses, clients]);
 
   const filtered = useMemo(() => searchFilter(routeStats, search, ['name', 'origin', 'destination']), [routeStats, search]);
 
