@@ -14,11 +14,11 @@ import { formatCurrency, formatDate, formatNumber } from '../../utils/helpers';
  */
 export function printInvoice(invoice, client, tripDetails, options = {}) {
   const {
-    companyName = 'Kinetic Cargo',
-    companyTagline = 'LOGISTICS OS',
-    companyAddress = 'P.O Box 12345-00100, Nairobi, Kenya',
-    companyPhone = '+254 700 000 000',
-    companyEmail = 'accounts@kineticcargo.co.ke',
+    companyName = 'Nory',
+    companyTagline = 'LOGISTICS LTD',
+    companyAddress = 'P.O Box 166-20406, Sotik, Kenya',
+    companyPhone = '+254 717357535',
+    companyEmail = 'accounts@norylogistics.co.ke',
     companyPin = 'P051234567A',
   } = options;
 

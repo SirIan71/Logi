@@ -24,8 +24,8 @@ export default function Sidebar() {
           <span className="material-symbols-outlined text-secondary-fixed">local_shipping</span>
         </div>
         <div>
-          <h2 className="font-headline font-extrabold text-teal-900 dark:text-teal-50 leading-tight">Kinetic Cargo</h2>
-          <p className="text-[10px] uppercase tracking-widest text-teal-700/60 font-bold">Logistics OS</p>
+          <h2 className="font-headline font-extrabold text-teal-900 dark:text-teal-50 leading-tight">Nory Logistics Ltd</h2>
+          <p className="text-[10px] uppercase tracking-widest text-teal-700/60 font-bold">Serving The Earth</p>
         </div>
       </div>
       
