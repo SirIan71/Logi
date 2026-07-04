@@ -6,19 +6,20 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!login(email, password)) {
-      setError('Invalid email or password');
+    setLoading(true);
+    try {
+      const success = await login(email, password);
+      if (!success) {
+        setError('Invalid email or password');
+      }
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const quickLogin = (email, password) => {
-    setEmail(email);
-    setPassword(password);
-    login(email, password);
   };
 
   return (
@@ -33,23 +34,16 @@ export default function Login() {
           {error && <div className="login-error">{error}</div>}
           <div className="form-group">
             <label className="form-label">Email</label>
-            <input className="form-input" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@sirian.co" required />
+            <input className="form-input" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" required />
           </div>
           <div className="form-group">
             <label className="form-label">Password</label>
             <input className="form-input" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
           </div>
-          <button type="submit" className="login-btn">Sign In</button>
+          <button type="submit" className="login-btn" disabled={loading}>
+            {loading ? 'Signing in…' : 'Sign In'}
+          </button>
         </form>
-        <div className="login-hint">
-          <strong>Quick Login (Demo):</strong><br/>
-          <div style={{display:'flex',flexWrap:'wrap',gap:'6px',marginTop:'8px'}}>
-            <button className="btn btn-sm btn-secondary" onClick={() => quickLogin('admin@sirian.co','admin123')}>Admin</button>
-            <button className="btn btn-sm btn-secondary" onClick={() => quickLogin('linda@sirian.co','finance123')}>Finance</button>
-            <button className="btn btn-sm btn-secondary" onClick={() => quickLogin('oscar@sirian.co','ops123')}>Operations</button>
-            <button className="btn btn-sm btn-secondary" onClick={() => quickLogin('james@sirian.co','admin123')}>Driver</button>
-          </div>
-        </div>
       </div>
     </div>
   );

@@ -27,11 +27,19 @@ export default function Trips() {
     return trips;
   }, [trips, isOwnOnly, user]);
 
+  const enrichedTrips = useMemo(() => visibleTrips.map(t => ({
+    ...t,
+    clientName: lookup('clients', t.client_id)?.company_name || '',
+    driverName: lookup('users', t.driver_id)?.name || '',
+    vehicleReg: lookup('vehicles', t.vehicle_id)?.registration || '',
+    routeName: lookup('routes', t.route_id)?.name || ''
+  })), [visibleTrips, lookup]);
+
   const filtered = useMemo(() => {
-    let data = statusFilter === 'all' ? visibleTrips : visibleTrips.filter(t => t.status === statusFilter);
-    return searchFilter(data, search, ['origin', 'destination', 'cargo_type', 'status'])
+    let data = statusFilter === 'all' ? enrichedTrips : enrichedTrips.filter(t => t.status === statusFilter);
+    return searchFilter(data, search, ['origin', 'destination', 'cargo_type', 'status', 'departure_date', 'clientName', 'driverName', 'vehicleReg', 'routeName'])
       .sort((a, b) => new Date(b.departure_date) - new Date(a.departure_date));
-  }, [visibleTrips, search, statusFilter]);
+  }, [enrichedTrips, search, statusFilter]);
 
   const openAdd = () => { setForm({ status: 'scheduled', departure_date: new Date().toISOString().split('T')[0] }); setModal('add'); };
   const openEdit = (t) => { setForm({ ...t }); setSelected(t); setModal('edit'); };

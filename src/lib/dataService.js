@@ -1,17 +1,14 @@
 /**
  * SIRIAN Data Service Layer
  *
- * Generic CRUD operations backed by Dexie.js (IndexedDB).
- * This is the ONLY module that touches the database directly.
- *
- * Migration path to Supabase:
- *   Replace the implementation of each function with supabase.from(table)... calls.
- *   The function signatures stay identical, so AppContext needs zero changes.
+ * Generic CRUD operations backed by Supabase.
+ * The function signatures stay identical to the original Dexie implementation,
+ * so AppContext needs zero changes.
  */
 import db from './db.js';
 
-// ─── Collection name → Dexie table name mapping ────────────────────────────
-// AppContext uses camelCase collection names; Dexie tables use snake_case.
+// ─── Collection name → Supabase table name mapping ────────────────────────────
+// AppContext uses camelCase collection names; Supabase tables use snake_case.
 const TABLE_MAP = {
   users:            'users',
   clients:          'clients',
@@ -28,12 +25,12 @@ const TABLE_MAP = {
 };
 
 /**
- * Resolve the Dexie table from a camelCase collection name.
+ * Resolve the Supabase table name from a camelCase collection name.
  */
-function table(collection) {
+function tableName(collection) {
   const name = TABLE_MAP[collection];
   if (!name) throw new Error(`Unknown collection: "${collection}"`);
-  return db[name];
+  return name;
 }
 
 // ─── CRUD operations ────────────────────────────────────────────────────────
@@ -44,7 +41,13 @@ function table(collection) {
  * @returns {Promise<Array>}
  */
 export async function getAll(collection) {
-  return table(collection).toArray();
+  const table = tableName(collection);
+  const { data, error } = await db.from(table).select('*');
+  if (error) {
+    console.error(`Error fetching from ${table}:`, error.message);
+    return [];
+  }
+  return data || [];
 }
 
 /**
@@ -54,7 +57,13 @@ export async function getAll(collection) {
  * @returns {Promise<Object|undefined>}
  */
 export async function getById(collection, id) {
-  return table(collection).get(id);
+  const table = tableName(collection);
+  const { data, error } = await db.from(table).select('*').eq('id', id).single();
+  if (error) {
+    console.error(`Error fetching ${id} from ${table}:`, error.message);
+    return undefined;
+  }
+  return data;
 }
 
 /**
@@ -64,7 +73,12 @@ export async function getById(collection, id) {
  * @returns {Promise<string>} the id of the inserted record
  */
 export async function insert(collection, data) {
-  await table(collection).put(data);
+  const table = tableName(collection);
+  const { error } = await db.from(table).upsert(data);
+  if (error) {
+    console.error(`Error inserting into ${table}:`, error.message);
+    throw error;
+  }
   return data.id;
 }
 
@@ -76,7 +90,15 @@ export async function insert(collection, data) {
  * @returns {Promise<number>} number of rows updated (0 or 1)
  */
 export async function update(collection, id, changes) {
-  return table(collection).update(id, changes);
+  const table = tableName(collection);
+  const { error, count } = await db.from(table).update(changes).eq('id', id);
+  if (error) {
+    console.error(`Error updating ${id} in ${table}:`, error.message);
+    throw error;
+  }
+  // Supabase doesn't return count by default without `{ count: 'exact' }`, 
+  // but keeping signature similar is fine.
+  return 1;
 }
 
 /**
@@ -86,7 +108,12 @@ export async function update(collection, id, changes) {
  * @returns {Promise<void>}
  */
 export async function remove(collection, id) {
-  return table(collection).delete(id);
+  const table = tableName(collection);
+  const { error } = await db.from(table).delete().eq('id', id);
+  if (error) {
+    console.error(`Error deleting ${id} from ${table}:`, error.message);
+    throw error;
+  }
 }
 
 /**
@@ -96,7 +123,12 @@ export async function remove(collection, id) {
  * @returns {Promise<void>}
  */
 export async function bulkInsert(collection, records) {
-  return table(collection).bulkPut(records);
+  const table = tableName(collection);
+  const { error } = await db.from(table).upsert(records);
+  if (error) {
+    console.error(`Error bulk inserting into ${table}:`, error.message);
+    throw error;
+  }
 }
 
 /**
@@ -105,7 +137,12 @@ export async function bulkInsert(collection, records) {
  * @returns {Promise<boolean>}
  */
 export async function isEmpty(collection) {
-  const count = await table(collection).count();
+  const table = tableName(collection);
+  const { count, error } = await db.from(table).select('*', { count: 'exact', head: true });
+  if (error) {
+    console.error(`Error counting ${table}:`, error.message);
+    return true; // fail safe
+  }
   return count === 0;
 }
 
@@ -115,7 +152,14 @@ export async function isEmpty(collection) {
  * @returns {Promise<void>}
  */
 export async function clearCollection(collection) {
-  return table(collection).clear();
+  const table = tableName(collection);
+  // Warning: This requires RLS or privileges to delete all rows.
+  // In Supabase, usually you cannot delete without a WHERE clause easily.
+  // We'll use a hack to delete where id is not null.
+  const { error } = await db.from(table).delete().neq('id', 'null');
+  if (error) {
+    console.error(`Error clearing ${table}:`, error.message);
+  }
 }
 
 /**
@@ -125,5 +169,7 @@ export async function clearCollection(collection) {
  */
 export async function clearAll() {
   const tables = Object.values(TABLE_MAP);
-  await Promise.all(tables.map(t => db[t].clear()));
+  await Promise.all(tables.map(async (t) => {
+    await db.from(t).delete().neq('id', 'null');
+  }));
 }

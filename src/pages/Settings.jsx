@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { usePermission } from '../hooks/usePermission';
-import { Shield, Users, Database, Palette, Bell, Check, X } from 'lucide-react';
-import { generateId } from '../utils/helpers';
+import { Shield, Users, Database, Palette, Bell, Check, X, UserPlus } from 'lucide-react';
+import db from '../lib/db.js';
 
 export default function Settings() {
   const { user, users, updateItem } = useApp();
@@ -28,9 +28,70 @@ export default function Settings() {
   const [passwordMinLength, setPasswordMinLength] = useState(8);
   const [requireSpecialChar, setRequireSpecialChar] = useState(true);
 
+  // ── Invite User state ──────────────────────────────────────────────────
+  const [inviteName, setInviteName] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [invitePhone, setInvitePhone] = useState('');
+  const [inviteRole, setInviteRole] = useState('driver');
+  const [invitePassword, setInvitePassword] = useState('');
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteMsg, setInviteMsg] = useState({ type: '', text: '' });
+
   const handleRoleChange = (userId, newRole) => {
     const u = users.find(x => x.id === userId);
     if(u) updateItem('users', { ...u, role: newRole });
+  };
+
+  const handleInviteUser = async (e) => {
+    e.preventDefault();
+    setInviteLoading(true);
+    setInviteMsg({ type: '', text: '' });
+
+    try {
+      // Create auth user via signUp — this triggers the DB trigger to create the profile
+      const { data, error } = await db.auth.signUp({
+        email: inviteEmail,
+        password: invitePassword,
+        options: {
+          data: {
+            name: inviteName,
+            phone: invitePhone,
+            role: inviteRole,
+          },
+        },
+      });
+
+      if (error) {
+        setInviteMsg({ type: 'error', text: error.message });
+        return;
+      }
+
+      if (data?.user) {
+        setInviteMsg({
+          type: 'success',
+          text: `User ${inviteEmail} created successfully! They can now log in with the password you set.`,
+        });
+        // Clear the form
+        setInviteName('');
+        setInviteEmail('');
+        setInvitePhone('');
+        setInviteRole('driver');
+        setInvitePassword('');
+
+        // Reload users list after a brief delay (trigger needs a moment)
+        setTimeout(async () => {
+          const { data: allUsers } = await db.from('users').select('*');
+          if (allUsers) {
+            // Dispatch through context isn't directly available, so we'll just note it
+            // The user list will refresh on next page navigation
+          }
+        }, 2000);
+      }
+    } catch (err) {
+      setInviteMsg({ type: 'error', text: err.message });
+    } finally {
+      setInviteLoading(false);
+    }
   };
 
   const applyTheme = (t) => {
@@ -125,6 +186,70 @@ export default function Settings() {
 
           {activeTab === 'User Management' && isAdmin && (
             <div>
+              {/* ── Invite User Form ────────────────────────────────────── */}
+              <div style={{
+                background: 'var(--bg-card)',
+                border: '1px dashed var(--border-color)',
+                borderRadius: 12,
+                padding: 20,
+                marginBottom: 24,
+              }}>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:16}}>
+                  <UserPlus size={18} style={{color:'var(--color-accent)'}} />
+                  <h3 style={{margin:0,fontSize:15,fontWeight:700}}>Invite New User</h3>
+                </div>
+
+                {inviteMsg.text && (
+                  <div style={{
+                    padding: '10px 14px',
+                    borderRadius: 8,
+                    marginBottom: 14,
+                    fontSize: 13,
+                    background: inviteMsg.type === 'error' ? '#fef2f2' : '#f0fdf4',
+                    color: inviteMsg.type === 'error' ? '#dc2626' : '#16a34a',
+                    border: `1px solid ${inviteMsg.type === 'error' ? '#fecaca' : '#bbf7d0'}`,
+                  }}>
+                    {inviteMsg.text}
+                  </div>
+                )}
+
+                <form onSubmit={handleInviteUser}>
+                  <div className="form-grid">
+                    <div className="form-group">
+                      <label className="form-label">Full Name</label>
+                      <input className="form-input" value={inviteName} onChange={e => setInviteName(e.target.value)} placeholder="e.g. John Moyo" required />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Email</label>
+                      <input className="form-input" type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="john@company.com" required />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Phone</label>
+                      <input className="form-input" type="tel" value={invitePhone} onChange={e => setInvitePhone(e.target.value)} placeholder="+27 71 234 5678" />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Role</label>
+                      <select className="form-select" value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
+                        <option value="admin">Admin</option>
+                        <option value="finance">Finance</option>
+                        <option value="operations">Operations</option>
+                        <option value="driver">Driver</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Temporary Password</label>
+                      <input className="form-input" type="text" value={invitePassword} onChange={e => setInvitePassword(e.target.value)} placeholder="Min 6 characters" minLength={6} required />
+                    </div>
+                    <div className="form-group" style={{display:'flex',alignItems:'flex-end'}}>
+                      <button type="submit" className="btn btn-primary" disabled={inviteLoading} style={{width:'100%'}}>
+                        {inviteLoading ? 'Creating…' : 'Create User'}
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+
+              {/* ── Existing Users Table ─────────────────────────────────── */}
               <table className="data-table" style={{width:'100%'}}>
                 <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th></tr></thead>
                 <tbody>

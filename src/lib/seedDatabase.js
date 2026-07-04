@@ -1,62 +1,43 @@
 /**
  * SIRIAN Database Seeder
  *
- * Seeds the local IndexedDB with the data from seedData.js.
- * Only runs if the database is empty (first launch or after a reset).
+ * Seeds the Supabase database with essential reference data only.
+ * Only runs if the expense_categories table is empty (first launch).
+ *
+ * All user/business data is created by real users through the app.
  */
-import {
-  users, clients, vehicles, routes, trips,
-  income, expenses, expenseCategories,
-  fuelRecords, maintenance, vehicleDocuments, auditLogs,
-} from '../data/seedData.js';
 import { bulkInsert, isEmpty } from './dataService.js';
 
+const DEFAULT_EXPENSE_CATEGORIES = [
+  { id: 'ec1', name: 'Fuel', default_redeemable: false, icon: 'Fuel' },
+  { id: 'ec2', name: 'Repairs & Maintenance', default_redeemable: false, icon: 'Wrench' },
+  { id: 'ec3', name: 'Tolls', default_redeemable: true, icon: 'CircleDollarSign' },
+  { id: 'ec4', name: 'Driver Allowances', default_redeemable: false, icon: 'Wallet' },
+  { id: 'ec5', name: 'Parking', default_redeemable: true, icon: 'ParkingCircle' },
+  { id: 'ec6', name: 'Loading / Offloading', default_redeemable: true, icon: 'Package' },
+  { id: 'ec7', name: 'Insurance', default_redeemable: false, icon: 'Shield' },
+  { id: 'ec8', name: 'Licenses & Permits', default_redeemable: false, icon: 'FileText' },
+  { id: 'ec9', name: 'Fines & Penalties', default_redeemable: false, icon: 'AlertTriangle' },
+  { id: 'ec10', name: 'Miscellaneous', default_redeemable: false, icon: 'MoreHorizontal' },
+  { id: 'ec11', name: 'Car Wash', default_redeemable: false, icon: 'Droplets' },
+];
+
 /**
- * Seed all collections if the database is empty.
+ * Seed essential reference data if the database is empty.
  * Returns true if seeding was performed, false if skipped.
  */
 export async function seedDatabase() {
-  // Check if the DB already has data (use 'users' as a canary)
-  const dbEmpty = await isEmpty('users');
+  const categoriesEmpty = await isEmpty('expenseCategories');
 
-  if (!dbEmpty) {
-    console.log('[SIRIAN DB] Database already seeded — skipping.');
+  if (!categoriesEmpty) {
+    console.log('[SIRIAN DB] Reference data already exists — skipping seed.');
     return false;
   }
 
-  console.log('[SIRIAN DB] Seeding database with initial data…');
-
-  const collections = {
-    users,
-    clients,
-    vehicles,
-    routes,
-    trips,
-    income,
-    expenses,
-    expenseCategories,
-    fuelRecords,
-    maintenance,
-    vehicleDocuments,
-    auditLogs,
-  };
-
-  for (const [name, records] of Object.entries(collections)) {
-    await bulkInsert(name, records);
-    console.log(`  ✓ ${name}: ${records.length} records`);
-  }
+  console.log('[SIRIAN DB] Seeding default expense categories…');
+  await bulkInsert('expenseCategories', DEFAULT_EXPENSE_CATEGORIES);
+  console.log(`  ✓ expenseCategories: ${DEFAULT_EXPENSE_CATEGORIES.length} records`);
 
   console.log('[SIRIAN DB] Seeding complete.');
   return true;
-}
-
-/**
- * Force re-seed: clears existing data and re-inserts seed data.
- * Useful for development/testing resets.
- */
-export async function reseedDatabase() {
-  const { clearAll } = await import('./dataService.js');
-  console.log('[SIRIAN DB] Clearing all data…');
-  await clearAll();
-  return seedDatabase();
 }

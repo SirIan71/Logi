@@ -1,5 +1,6 @@
 import { createContext, useContext, useReducer, useCallback, useEffect, useState } from 'react';
 import { getAll, insert, update as dbUpdate, remove as dbRemove } from '../lib/dataService.js';
+import db from '../lib/db.js';
 import { seedDatabase } from '../lib/seedDatabase.js';
 
 const AppContext = createContext();
@@ -21,7 +22,7 @@ const initialState = {
 function reducer(state, action) {
   switch (action.type) {
     case 'LOGIN': return { ...state, user: action.payload };
-    case 'LOGOUT': return { ...state, user: null };
+    case 'LOGOUT': return initialState;
     case 'TOGGLE_SIDEBAR': return { ...state, sidebarOpen: !state.sidebarOpen };
     case 'SET_COLLECTION': return { ...state, [action.collection]: action.payload };
     case 'ADD_ITEM': return { ...state, [action.collection]: [...state[action.collection], action.payload] };
@@ -31,26 +32,49 @@ function reducer(state, action) {
   }
 }
 
+/**
+ * Load all collections from Supabase into React state.
+ */
+async function loadAllCollections(dispatch) {
+  for (const name of COLLECTIONS) {
+    const data = await getAll(name);
+    dispatch({ type: 'SET_COLLECTION', collection: name, payload: data });
+  }
+}
+
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [dbReady, setDbReady] = useState(false);
   const [dbError, setDbError] = useState(null);
 
-  // ── Initialise database and load all data ─────────────────────────────
+  // ── Initialise: restore session & load data ─────────────────────────────
   useEffect(() => {
     let cancelled = false;
 
     async function init() {
       try {
-        // Seed database on first launch (no-op if already seeded)
+        // Check for an existing auth session (e.g. page refresh)
+        const { data: { session } } = await db.auth.getSession();
+
+        if (session) {
+          // User is already authenticated — fetch their profile
+          const { data: userRecord } = await db
+            .from('users')
+            .select('*')
+            .eq('auth_id', session.user.id)
+            .single();
+
+          if (userRecord && !cancelled) {
+            dispatch({ type: 'LOGIN', payload: userRecord });
+          }
+        }
+
+        // Seed essential reference data (expense categories) if needed
         await seedDatabase();
 
-        // Load every collection from IndexedDB into state
-        for (const name of COLLECTIONS) {
-          const data = await getAll(name);
-          if (!cancelled) {
-            dispatch({ type: 'SET_COLLECTION', collection: name, payload: data });
-          }
+        // Only load collections if the user is authenticated
+        if (session && !cancelled) {
+          await loadAllCollections(dispatch);
         }
 
         if (!cancelled) setDbReady(true);
@@ -61,20 +85,71 @@ export function AppProvider({ children }) {
     }
 
     init();
-    return () => { cancelled = true; };
-  }, []);
+
+    // Listen for auth state changes (sign in, sign out, token refresh)
+    const { data: { subscription } } = db.auth.onAuthStateChange(async (event, session) => {
+      if (cancelled) return;
+
+      if (event === 'SIGNED_OUT') {
+        dispatch({ type: 'LOGOUT' });
+      } else if (event === 'SIGNED_IN' && session) {
+        // Fetch the user profile from our users table
+        const { data: userRecord } = await db
+          .from('users')
+          .select('*')
+          .eq('auth_id', session.user.id)
+          .single();
+
+        if (userRecord && !cancelled) {
+          dispatch({ type: 'LOGIN', payload: userRecord });
+          await loadAllCollections(dispatch);
+        }
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      subscription?.unsubscribe();
+    };
+  }, []); // Empty dependency array — runs once on mount
 
   // ── Auth ───────────────────────────────────────────────────────────────
-  const login = useCallback((email, password) => {
-    const u = state.users.find(u => u.email === email && u.password === password);
-    if (u) { dispatch({ type: 'LOGIN', payload: u }); return true; }
-    return false;
-  }, [state.users]);
+  const login = useCallback(async (email, password) => {
+    try {
+      const { data, error } = await db.auth.signInWithPassword({ email, password });
+      if (error || !data.session) {
+        console.error('Login error:', error?.message);
+        return false;
+      }
 
-  const logout = useCallback(() => dispatch({ type: 'LOGOUT' }), []);
+      // Fetch user record from our users table using the auth UUID
+      const { data: userRecord } = await db
+        .from('users')
+        .select('*')
+        .eq('auth_id', data.user.id)
+        .single();
+
+      if (userRecord) {
+        dispatch({ type: 'LOGIN', payload: userRecord });
+        // After login, RLS is now active for this user — load all data
+        await loadAllCollections(dispatch);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error(err);
+      return false;
+    }
+  }, []);
+
+  const logout = useCallback(async () => {
+    await db.auth.signOut();
+    dispatch({ type: 'LOGOUT' });
+  }, []);
+
   const toggleSidebar = useCallback(() => dispatch({ type: 'TOGGLE_SIDEBAR' }), []);
 
-  // ── CRUD — writes to IndexedDB first, then updates React state ────────
+  // ── CRUD — writes to Supabase first, then updates React state ──────────
   const addItem = useCallback(async (collection, item) => {
     try {
       await insert(collection, item);
@@ -117,7 +192,7 @@ export function AppProvider({ children }) {
       }}>
         <h2 style={{ margin: 0 }}>Database Error</h2>
         <p style={{ color: '#94a3b8', maxWidth: 480, textAlign: 'center' }}>
-          Failed to initialise the local database. This usually means your browser doesn't support IndexedDB or storage is full.
+          Failed to connect to the database. Please check your internet connection and try again.
         </p>
         <code style={{ background: '#1e293b', padding: '0.75rem 1.5rem', borderRadius: '0.5rem', fontSize: '0.85rem' }}>
           {dbError}
@@ -138,7 +213,7 @@ export function AppProvider({ children }) {
           borderTopColor: '#3b82f6', borderRadius: '50%',
           animation: 'spin 0.8s linear infinite',
         }} />
-        <p style={{ color: '#94a3b8' }}>Initialising database…</p>
+        <p style={{ color: '#94a3b8' }}>Connecting to SIRIAN…</p>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
