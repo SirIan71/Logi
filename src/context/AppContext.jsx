@@ -58,22 +58,34 @@ export function AppProvider({ children }) {
 
         if (session) {
           // User is already authenticated — fetch their profile
-          const { data: userRecord } = await db
+          let userRecord = null;
+          // Try auth_id lookup first, fall back to email if column doesn't exist yet
+          const { data: byAuthId, error: authIdErr } = await db
             .from('users')
             .select('*')
             .eq('auth_id', session.user.id)
             .single();
+          
+          if (byAuthId) {
+            userRecord = byAuthId;
+          } else {
+            // Fallback: match by email (before migration is applied)
+            const { data: byEmail } = await db
+              .from('users')
+              .select('*')
+              .eq('email', session.user.email)
+              .single();
+            userRecord = byEmail;
+          }
 
           if (userRecord && !cancelled) {
             dispatch({ type: 'LOGIN', payload: userRecord });
           }
         }
 
-        // Seed essential reference data (expense categories) if needed
-        await seedDatabase();
-
-        // Only load collections if the user is authenticated
+        // Only seed and load data if the user is authenticated (RLS requires it)
         if (session && !cancelled) {
+          await seedDatabase();
           await loadAllCollections(dispatch);
         }
 
@@ -93,12 +105,17 @@ export function AppProvider({ children }) {
       if (event === 'SIGNED_OUT') {
         dispatch({ type: 'LOGOUT' });
       } else if (event === 'SIGNED_IN' && session) {
-        // Fetch the user profile from our users table
-        const { data: userRecord } = await db
-          .from('users')
-          .select('*')
-          .eq('auth_id', session.user.id)
-          .single();
+        // Fetch the user profile (try auth_id first, then email)
+        let userRecord = null;
+        const { data: byAuthId } = await db
+          .from('users').select('*').eq('auth_id', session.user.id).single();
+        if (byAuthId) {
+          userRecord = byAuthId;
+        } else {
+          const { data: byEmail } = await db
+            .from('users').select('*').eq('email', session.user.email).single();
+          userRecord = byEmail;
+        }
 
         if (userRecord && !cancelled) {
           dispatch({ type: 'LOGIN', payload: userRecord });
@@ -122,12 +139,17 @@ export function AppProvider({ children }) {
         return false;
       }
 
-      // Fetch user record from our users table using the auth UUID
-      const { data: userRecord } = await db
-        .from('users')
-        .select('*')
-        .eq('auth_id', data.user.id)
-        .single();
+      // Fetch user record (try auth_id first, then email)
+      let userRecord = null;
+      const { data: byAuthId } = await db
+        .from('users').select('*').eq('auth_id', data.user.id).single();
+      if (byAuthId) {
+        userRecord = byAuthId;
+      } else {
+        const { data: byEmail } = await db
+          .from('users').select('*').eq('email', email).single();
+        userRecord = byEmail;
+      }
 
       if (userRecord) {
         dispatch({ type: 'LOGIN', payload: userRecord });
