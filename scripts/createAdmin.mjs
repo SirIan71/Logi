@@ -16,6 +16,7 @@ import { createClient } from '@supabase/supabase-js';
 import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import ws from 'ws';
 
 // ── Load env vars from .env.local ────────────────────────────────────────────
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -35,9 +36,10 @@ if (!supabaseUrl || !supabaseServiceKey) {
   process.exit(1);
 }
 
-// Use the service role key for admin operations
+// Use the service role key for admin operations (ws needed for Node.js < 22)
 const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   auth: { autoRefreshToken: false, persistSession: false },
+  realtime: { transport: ws },
 });
 
 // ── Config ───────────────────────────────────────────────────────────────────
