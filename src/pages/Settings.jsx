@@ -255,7 +255,7 @@ export default function Settings() {
                 <tbody>
                   {users.map(u => (
                     <tr key={u.id}>
-                      <td className="primary">{u.name}</td>
+                      <td className="primary">{u.first_name ? `${u.first_name} ${u.last_name || ''}`.trim() : (u.name || u.email)}</td>
                       <td>{u.email}</td>
                       <td>
                         <select className="form-select" style={{padding:'4px 8px', fontSize:12}} value={u.role} onChange={e => handleRoleChange(u.id, e.target.value)} disabled={u.role==='admin' && u.id===user.id}>

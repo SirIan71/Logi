@@ -30,7 +30,11 @@ export default function Trips() {
   const enrichedTrips = useMemo(() => visibleTrips.map(t => ({
     ...t,
     clientName: lookup('clients', t.client_id)?.company_name || '',
-    driverName: lookup('users', t.driver_id)?.name || '',
+    driverName: (() => {
+      const u = lookup('users', t.driver_id);
+      if (!u) return '';
+      return `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.name || '';
+    })(),
     vehicleReg: lookup('vehicles', t.vehicle_id)?.registration || '',
     routeName: lookup('routes', t.route_id)?.name || ''
   })), [visibleTrips, lookup]);
@@ -113,7 +117,7 @@ export default function Trips() {
             const veh = vehicles.find(v => v.assigned_driver_id === driver_id);
             setForm({...form, driver_id, vehicle_id: veh ? veh.id : (form.vehicle_id || '')});
         }}>
-          <option value="">Select driver</option>{drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+          <option value="">Select driver</option>{drivers.map(d => <option key={d.id} value={d.id}>{`${d.first_name || ''} ${d.last_name || ''}`.trim() || d.name}</option>)}
         </select>
       </div>
       <div className="form-group"><label className="form-label">Vehicle</label>
@@ -170,7 +174,7 @@ export default function Trips() {
                     <td className="primary">{t.origin} → {t.destination}</td>
                     <td>{lookup('clients', t.client_id)?.company_name || '—'}</td>
                     <td>{lookup('vehicles', t.vehicle_id)?.registration || '—'}</td>
-                    <td>{lookup('users', t.driver_id)?.name || '—'}</td>
+                    <td>{lookup('users', t.driver_id) ? (`${lookup('users', t.driver_id).first_name || ''} ${lookup('users', t.driver_id).last_name || ''}`.trim() || lookup('users', t.driver_id).name || '—') : '—'}</td>
                     <td>{t.cargo_type}</td>
                     <td>{formatDate(t.departure_date)}</td>
                     <td><StatusBadge status={t.status} /></td>
@@ -204,7 +208,7 @@ export default function Trips() {
             <div><div className="detail-label">Status</div><div className="detail-value"><StatusBadge status={selected.status}/></div></div>
             <div><div className="detail-label">Client</div><div className="detail-value">{lookup('clients', selected.client_id)?.company_name}</div></div>
             <div><div className="detail-label">Vehicle</div><div className="detail-value">{lookup('vehicles', selected.vehicle_id)?.registration}</div></div>
-            <div><div className="detail-label">Driver</div><div className="detail-value">{lookup('users', selected.driver_id)?.name}</div></div>
+            <div><div className="detail-label">Driver</div><div className="detail-value">{lookup('users', selected.driver_id) ? (`${lookup('users', selected.driver_id).first_name || ''} ${lookup('users', selected.driver_id).last_name || ''}`.trim() || lookup('users', selected.driver_id).name || '—') : '—'}</div></div>
             <div><div className="detail-label">Cargo</div><div className="detail-value">{selected.cargo_type} — {selected.cargo_weight_tons}t</div></div>
             <div><div className="detail-label">Departure</div><div className="detail-value">{formatDate(selected.departure_date)}</div></div>
             <div><div className="detail-label">Arrival</div><div className="detail-value">{formatDate(selected.arrival_date)}</div></div>

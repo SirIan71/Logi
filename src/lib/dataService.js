@@ -24,6 +24,24 @@ const TABLE_MAP = {
   auditLogs:        'audit_logs',
 };
 
+// ─── Column whitelists per table (must match DB schema exactly) ────────────────
+// Any field NOT in this list is stripped before insert/update to prevent
+// "column does not exist" errors from Supabase.
+const COLUMN_WHITELIST = {
+  users:              ['id', 'auth_id', 'first_name', 'last_name', 'email', 'phone', 'role', 'is_active', 'password', 'created_at', 'updated_at'],
+  clients:            ['id', 'company_name', 'contact_person', 'email', 'phone', 'address', 'payment_terms_days', 'contract_type', 'status', 'rate_type', 'rate_amount', 'created_at'],
+  vehicles:           ['id', 'registration', 'make', 'model', 'year', 'capacity_tons', 'current_odometer', 'status', 'assigned_driver_id', 'tank_capacity_liters', 'created_at'],
+  routes:             ['id', 'name', 'origin', 'destination', 'distance_km', 'estimated_fuel_liters', 'estimated_tolls', 'estimated_duration_hours', 'notes', 'created_at'],
+  trips:              ['id', 'route_id', 'vehicle_id', 'driver_id', 'client_id', 'origin', 'destination', 'cargo_type', 'cargo_weight_tons', 'departure_date', 'arrival_date', 'estimated_distance_km', 'actual_distance_km', 'status', 'notes', 'created_at', 'updated_at'],
+  income:             ['id', 'trip_id', 'client_id', 'invoice_number', 'amount', 'amount_paid', 'payment_status', 'payment_date', 'due_date', 'notes', 'created_at'],
+  expense_categories: ['id', 'name', 'default_redeemable', 'icon'],
+  expenses:           ['id', 'trip_id', 'vehicle_id', 'driver_id', 'category_id', 'amount', 'is_redeemable', 'is_redeemed', 'expense_date', 'receipt_url', 'submitted_by', 'notes', 'approval_status', 'approved_by', 'created_at'],
+  fuel_records:       ['id', 'vehicle_id', 'trip_id', 'recorded_by', 'liters', 'cost', 'odometer_reading', 'station', 'date', 'created_at'],
+  maintenance:        ['id', 'vehicle_id', 'type', 'service_type', 'description', 'cost', 'service_date', 'odometer_at_service', 'next_due_km', 'next_due_date', 'vendor', 'notes', 'created_at'],
+  vehicle_documents:  ['id', 'vehicle_id', 'doc_type', 'issue_date', 'expiry_date', 'notes'],
+  audit_logs:         ['id', 'user_id', 'entity_type', 'entity_id', 'action', 'old_values', 'new_values', 'ip_address', 'created_at'],
+};
+
 /**
  * Resolve the Supabase table name from a camelCase collection name.
  */
@@ -31,6 +49,30 @@ function tableName(collection) {
   const name = TABLE_MAP[collection];
   if (!name) throw new Error(`Unknown collection: "${collection}"`);
   return name;
+}
+
+/**
+ * Strip any fields that don't exist as columns in the DB table.
+ * Also convert empty strings to null for foreign-key columns,
+ * since Supabase FK constraints reject "" (not a valid reference).
+ */
+const FK_COLUMNS = new Set([
+  'route_id', 'vehicle_id', 'driver_id', 'client_id', 'trip_id',
+  'category_id', 'user_id', 'recorded_by', 'assigned_driver_id', 'auth_id',
+  'submitted_by', 'approved_by',
+]);
+
+function sanitize(table, data) {
+  const allowed = COLUMN_WHITELIST[table];
+  if (!allowed) return data; // No whitelist defined — pass through
+  const clean = {};
+  for (const key of allowed) {
+    if (key in data) {
+      // Convert empty strings to null for FK columns
+      clean[key] = (FK_COLUMNS.has(key) && data[key] === '') ? null : data[key];
+    }
+  }
+  return clean;
 }
 
 // ─── CRUD operations ────────────────────────────────────────────────────────
@@ -74,7 +116,8 @@ export async function getById(collection, id) {
  */
 export async function insert(collection, data) {
   const table = tableName(collection);
-  const { error } = await db.from(table).upsert(data);
+  const clean = sanitize(table, data);
+  const { error } = await db.from(table).upsert(clean);
   if (error) {
     console.error(`Error inserting into ${table}:`, error.message);
     throw error;
@@ -91,7 +134,8 @@ export async function insert(collection, data) {
  */
 export async function update(collection, id, changes) {
   const table = tableName(collection);
-  const { error, count } = await db.from(table).update(changes).eq('id', id);
+  const clean = sanitize(table, changes);
+  const { error, count } = await db.from(table).update(clean).eq('id', id);
   if (error) {
     console.error(`Error updating ${id} in ${table}:`, error.message);
     throw error;
@@ -124,7 +168,8 @@ export async function remove(collection, id) {
  */
 export async function bulkInsert(collection, records) {
   const table = tableName(collection);
-  const { error } = await db.from(table).upsert(records);
+  const cleanRecords = records.map(r => sanitize(table, r));
+  const { error } = await db.from(table).upsert(cleanRecords);
   if (error) {
     console.error(`Error bulk inserting into ${table}:`, error.message);
     throw error;

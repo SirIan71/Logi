@@ -2,26 +2,30 @@
 
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
-  name TEXT,
+  first_name TEXT,
+  last_name TEXT,
   email TEXT UNIQUE,
   phone TEXT,
   role TEXT,
   is_active BOOLEAN,
-  password TEXT -- Plaintext password kept for backward compatibility with AppContext
+  password TEXT, -- Plaintext password kept for backward compatibility with AppContext
+  created_at timestamp,
+  updated_at timestamp
 );
 
 CREATE TABLE IF NOT EXISTS clients (
   id TEXT PRIMARY KEY,
   company_name TEXT,
   contact_person TEXT,
-  email TEXT,
-  phone TEXT,
+  email EMAIL,
+  phone NUMERIC,
   address TEXT,
   payment_terms_days INT,
   contract_type TEXT,
   status TEXT,
-  rate_type TEXT,
-  rate_amount NUMERIC
+  rate_type NUMERIC,
+  rate_amount NUMERIC,
+  created_at TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS vehicles (
@@ -34,7 +38,8 @@ CREATE TABLE IF NOT EXISTS vehicles (
   current_odometer NUMERIC,
   status TEXT,
   assigned_driver_id TEXT REFERENCES users(id) ON DELETE SET NULL,
-  tank_capacity_liters NUMERIC
+  tank_capacity_liters NUMERIC,
+  created_at TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS routes (
@@ -46,7 +51,8 @@ CREATE TABLE IF NOT EXISTS routes (
   estimated_fuel_liters NUMERIC,
   estimated_tolls NUMERIC,
   estimated_duration_hours NUMERIC,
-  notes TEXT
+  notes TEXT,
+  created_at TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS trips (
@@ -63,7 +69,10 @@ CREATE TABLE IF NOT EXISTS trips (
   arrival_date TEXT,
   estimated_distance_km NUMERIC,
   actual_distance_km NUMERIC,
-  status TEXT
+  status TEXT,
+  notes TEXT,
+  created_at TIMESTAMP,
+  updated_at TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS income (
@@ -75,7 +84,9 @@ CREATE TABLE IF NOT EXISTS income (
   amount_paid NUMERIC,
   payment_status TEXT,
   payment_date TEXT,
-  due_date TEXT
+  due_date TEXT,
+  notes TEXT,
+  created_at TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS expense_categories (
@@ -95,8 +106,12 @@ CREATE TABLE IF NOT EXISTS expenses (
   is_redeemable BOOLEAN,
   is_redeemed BOOLEAN,
   expense_date TEXT,
+  receipt_url VARCHAR,
+  submitted_by TEXT references users(id) ON DELETE SET NULL,
   notes TEXT,
-  approval_status TEXT
+  approval_status TEXT,
+  approved_by TEXT references users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS fuel_records (
@@ -108,7 +123,8 @@ CREATE TABLE IF NOT EXISTS fuel_records (
   cost NUMERIC,
   odometer_reading NUMERIC,
   station TEXT,
-  date TEXT
+  date TEXT,
+  created_at TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS maintenance (
@@ -122,7 +138,9 @@ CREATE TABLE IF NOT EXISTS maintenance (
   odometer_at_service NUMERIC,
   next_due_km NUMERIC,
   next_due_date TEXT,
-  vendor TEXT
+  vendor TEXT,
+  notes TEXT,
+  created_at TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS vehicle_documents (
@@ -130,7 +148,8 @@ CREATE TABLE IF NOT EXISTS vehicle_documents (
   vehicle_id TEXT REFERENCES vehicles(id) ON DELETE CASCADE,
   doc_type TEXT,
   issue_date TEXT,
-  expiry_date TEXT
+  expiry_date TEXT,
+  notes TEXT
 );
 
 CREATE TABLE IF NOT EXISTS audit_logs (
@@ -141,6 +160,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   action TEXT,
   old_values JSONB,
   new_values JSONB,
+  ip_address VARCHAR,
   created_at TEXT
 );
 

@@ -13,12 +13,13 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_id UUID UNIQUE;
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
-  INSERT INTO public.users (id, auth_id, email, name, phone, role, is_active)
+  INSERT INTO public.users (id, auth_id, email, first_name, last_name, phone, role, is_active)
   VALUES (
     gen_random_uuid()::text,
     NEW.id,
     NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
+    COALESCE(NEW.raw_user_meta_data->>'first_name', COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1))),
+    COALESCE(NEW.raw_user_meta_data->>'last_name', ''),
     COALESCE(NEW.raw_user_meta_data->>'phone', ''),
     COALESCE(NEW.raw_user_meta_data->>'role', 'driver'),
     true

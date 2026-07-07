@@ -55,14 +55,14 @@ export default function Topbar() {
         <div className="h-8 w-[1px] bg-outline-variant mx-2"></div>
         <div className="flex items-center gap-3 pl-2">
           <div className="text-right">
-            <p className="text-sm font-bold text-primary">{user?.name || 'Admin User'}</p>
+            <p className="text-sm font-bold text-primary">{user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : (user?.name || 'Admin User')}</p>
             <p className="text-[10px] text-primary/60 font-medium uppercase tracking-wider">{user?.role || 'Super Administrator'}</p>
           </div>
           {user?.avatar ? (
             <img alt="User profile" className="w-10 h-10 rounded-xl object-cover" src={user.avatar} />
           ) : (
              <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-on-primary font-bold">
-               {user?.name?.charAt(0) || 'A'}
+               {user?.first_name?.charAt(0) || user?.name?.charAt(0) || 'A'}
              </div>
           )}
         </div>

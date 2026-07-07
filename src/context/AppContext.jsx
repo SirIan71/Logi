@@ -171,36 +171,70 @@ export function AppProvider({ children }) {
 
   const toggleSidebar = useCallback(() => dispatch({ type: 'TOGGLE_SIDEBAR' }), []);
 
+  // ── Toast Notifications ────────────────────────────────────────────────
+  const [toasts, setToasts] = useState([]);
+
+  const showToast = useCallback((message, type = 'success') => {
+    const id = Date.now() + Math.random().toString(36).substr(2, 9);
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  }, []);
+
+  const getCollectionLabel = (col) => {
+    const labels = {
+      users: 'User',
+      clients: 'Client',
+      vehicles: 'Vehicle',
+      routes: 'Route',
+      trips: 'Trip',
+      income: 'Income transaction',
+      expenses: 'Expense',
+      expenseCategories: 'Expense Category',
+      fuelRecords: 'Fuel Record',
+      maintenance: 'Maintenance Service',
+      vehicleDocuments: 'Vehicle Document',
+    };
+    return labels[col] || col;
+  };
+
   // ── CRUD — writes to Supabase first, then updates React state ──────────
   const addItem = useCallback(async (collection, item) => {
     try {
       await insert(collection, item);
       dispatch({ type: 'ADD_ITEM', collection, payload: item });
+      showToast(`${getCollectionLabel(collection)} added successfully!`, 'success');
     } catch (err) {
       console.error(`[SIRIAN DB] Failed to add to ${collection}:`, err);
+      showToast(`Failed to add ${getCollectionLabel(collection).toLowerCase()}.`, 'error');
     }
-  }, []);
+  }, [showToast]);
 
   const updateItem = useCallback(async (collection, item) => {
     try {
       const { id, ...changes } = item;
       await dbUpdate(collection, id, changes);
       dispatch({ type: 'UPDATE_ITEM', collection, payload: item });
+      showToast(`${getCollectionLabel(collection)} updated successfully!`, 'success');
     } catch (err) {
       console.error(`[SIRIAN DB] Failed to update ${collection}:`, err);
+      showToast(`Failed to update ${getCollectionLabel(collection).toLowerCase()}.`, 'error');
     }
-  }, []);
+  }, [showToast]);
 
   const deleteItem = useCallback(async (collection, id) => {
     if (window.confirm('Are you sure you want to delete this record?')) {
       try {
         await dbRemove(collection, id);
         dispatch({ type: 'DELETE_ITEM', collection, payload: { id } });
+        showToast(`${getCollectionLabel(collection)} deleted successfully!`, 'success');
       } catch (err) {
         console.error(`[SIRIAN DB] Failed to delete from ${collection}:`, err);
+        showToast(`Failed to delete ${getCollectionLabel(collection).toLowerCase()}.`, 'error');
       }
     }
-  }, []);
+  }, [showToast]);
 
   const lookup = useCallback((collection, id) => state[collection]?.find(i => i.id === id), [state]);
 
@@ -242,8 +276,24 @@ export function AppProvider({ children }) {
   }
 
   return (
-    <AppContext.Provider value={{ ...state, login, logout, toggleSidebar, addItem, updateItem, deleteItem, lookup, dispatch }}>
+    <AppContext.Provider value={{ ...state, login, logout, toggleSidebar, addItem, updateItem, deleteItem, lookup, showToast, dispatch }}>
       {children}
+      <div className="toast-container">
+        {toasts.map(t => (
+          <div key={t.id} className={`toast-item toast-${t.type}`}>
+            <div className="toast-content">
+              {t.type === 'success' && <span className="material-symbols-outlined" style={{color: 'var(--color-success)'}}>check_circle</span>}
+              {t.type === 'error' && <span className="material-symbols-outlined" style={{color: 'var(--color-danger)'}}>error</span>}
+              {t.type === 'info' && <span className="material-symbols-outlined" style={{color: 'var(--color-info)'}}>info</span>}
+              {t.type === 'warning' && <span className="material-symbols-outlined" style={{color: 'var(--color-warning)'}}>warning</span>}
+              <span>{t.message}</span>
+            </div>
+            <button onClick={() => setToasts(prev => prev.filter(item => item.id !== t.id))} className="toast-close">
+              <span className="material-symbols-outlined" style={{fontSize: 18}}>close</span>
+            </button>
+          </div>
+        ))}
+      </div>
     </AppContext.Provider>
   );
 }

@@ -17,20 +17,45 @@ export default function Drivers() {
     return drivers.map(d => {
       const dbTrips = trips.filter(t => t.driver_id === d.id);
       const vehicle = vehicles.find(v => v.assigned_driver_id === d.id);
-      return { ...d, tripCount: dbTrips.length, assignedVehicle: vehicle ? vehicle.registration : 'None' };
+      return { 
+        ...d, 
+        tripCount: dbTrips.length, 
+        assignedVehicle: vehicle ? vehicle.registration : 'None',
+        displayName: `${d.first_name || ''} ${d.last_name || ''}`.trim() || d.name || 'Unnamed Driver'
+      };
     }).sort((a, b) => b.tripCount - a.tripCount);
   }, [users, trips, vehicles]);
 
-  const filtered = useMemo(() => searchFilter(driversStats, search, ['name', 'email', 'phone', 'assignedVehicle']), [driversStats, search]);
+  const filtered = useMemo(() => searchFilter(driversStats, search, ['displayName', 'email', 'phone', 'assignedVehicle']), [driversStats, search]);
 
-  const openAdd = () => { setForm({ role: 'driver', is_active: true, assigned_vehicle_id: '' }); setModal('add'); };
-  const openEdit = (d) => { const v = vehicles.find(veh => veh.assigned_driver_id === d.id); setForm({ ...d, assigned_vehicle_id: v ? v.id : '' }); setModal('edit'); };
+  const openAdd = () => { setForm({ role: 'driver', is_active: true, assigned_vehicle_id: '', name: '' }); setModal('add'); };
+  const openEdit = (d) => { 
+    const v = vehicles.find(veh => veh.assigned_driver_id === d.id); 
+    setForm({ 
+      ...d, 
+      name: `${d.first_name || ''} ${d.last_name || ''}`.trim() || d.name || '',
+      assigned_vehicle_id: v ? v.id : '' 
+    }); 
+    setModal('edit'); 
+  };
   const openView = (d) => { setSelected(d); setModal('view'); };
   const closeModal = () => { setModal(null); setSelected(null); setForm({}); };
   const save = () => {
     const driverId = modal === 'add' ? generateId('d') : form.id;
-    const { assigned_vehicle_id, ...driverObj } = form;
-    if (modal === 'add') addItem('users', { ...driverObj, id: driverId }); else updateItem('users', driverObj);
+    const { assigned_vehicle_id, name, displayName, tripCount, assignedVehicle, ...driverObj } = form;
+    
+    // Split full name into first_name and last_name
+    const trimmedName = (name || '').trim();
+    const spaceIndex = trimmedName.indexOf(' ');
+    let first_name = trimmedName;
+    let last_name = '';
+    if (spaceIndex !== -1) {
+      first_name = trimmedName.substring(0, spaceIndex);
+      last_name = trimmedName.substring(spaceIndex + 1);
+    }
+    
+    const finalDriver = { ...driverObj, first_name, last_name };
+    if (modal === 'add') addItem('users', { ...finalDriver, id: driverId }); else updateItem('users', finalDriver);
     
     // Clear currently assigned vehicle(s) for this driver
     vehicles.forEach(v => {
@@ -54,7 +79,7 @@ export default function Drivers() {
       <div className="page-header"><h1>Drivers</h1>
         <div className="page-header-actions">
           <button className="btn btn-secondary" onClick={() => exportToCSV(filtered, 'drivers', [
-            { label: 'Name', accessor: r => r.name }, { label: 'Phone', accessor: r => r.phone },
+            { label: 'Name', accessor: r => r.displayName }, { label: 'Phone', accessor: r => r.phone },
             { label: 'Vehicle', accessor: r => r.assignedVehicle }, { label: 'Trips', accessor: r => r.tripCount },
             { label: 'Status', accessor: r => r.is_active ? 'active' : 'inactive' },
           ])}><Download size={16}/> Export</button>
@@ -69,16 +94,16 @@ export default function Drivers() {
             <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Assigned Vehicle</th><th>Trips</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody>{filtered.length === 0 ? <tr><td colSpan={7} className="table-empty">No drivers found</td></tr> : filtered.map(d => (
               <tr key={d.id}>
-                <td className="primary">{d.name}</td>
+                <td className="primary">{d.displayName}</td>
                 <td>{d.email || '—'}</td>
                 <td>{d.phone || '—'}</td>
                 <td>{d.assignedVehicle}</td>
                 <td className="numeric">{d.tripCount}</td>
                 <td><StatusBadge status={d.is_active ? 'active' : 'inactive'}/></td>
                 <td><div style={{display:'flex',gap:4}}>
-                  <button className="btn-icon" onClick={()=>openView(d)}><Eye size={16}/></button>
-                  <button className="btn-icon" onClick={()=>openEdit(d)}><Edit2 size={16}/></button>
-                  <button className="btn-icon" onClick={()=>deleteItem('users',d.id)}><Trash2 size={16}/></button>
+                   <button className="btn-icon" onClick={()=>openView(d)}><Eye size={16}/></button>
+                   <button className="btn-icon" onClick={()=>openEdit(d)}><Edit2 size={16}/></button>
+                   <button className="btn-icon" onClick={()=>deleteItem('users',d.id)}><Trash2 size={16}/></button>
                 </div></td>
               </tr>
             ))}</tbody>
@@ -87,7 +112,7 @@ export default function Drivers() {
         <div className="table-footer"><span>{filtered.length} drivers</span></div>
       </div>
 
-      {modal === 'view' && selected && <Modal title={selected.name} onClose={closeModal}>
+      {modal === 'view' && selected && <Modal title={selected.displayName} onClose={closeModal}>
         <div className="detail-grid">
           <div><div className="detail-label">Email</div><div className="detail-value">{selected.email || '—'}</div></div>
           <div><div className="detail-label">Phone</div><div className="detail-value">{selected.phone || '—'}</div></div>

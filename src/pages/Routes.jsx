@@ -39,12 +39,12 @@ export default function Routes() {
   const openAdd = () => { setForm({}); setModal('add'); };
   const openEdit = (r) => { setForm({ ...r }); setModal('edit'); };
   const closeModal = () => { setModal(null); setForm({}); };
-  const save = () => { 
-    const data = { ...form, distance_km: +form.distance_km || 0, estimated_fuel_liters: +form.estimated_fuel_liters || 0, estimated_fuel_cost: +form.estimated_fuel_cost || 0, estimated_tolls: +form.estimated_tolls || 0, estimated_duration_hours: +form.estimated_duration_hours || 0 }; 
+  const save = () => {
+    const data = { ...form, distance_km: +form.distance_km || 0, estimated_fuel_liters: +form.estimated_fuel_liters || 0, estimated_fuel_cost: +form.estimated_fuel_cost || 0, estimated_tolls: +form.estimated_tolls || 0, estimated_duration_hours: +form.estimated_duration_hours || 0 };
 
-    if (modal === 'add') addItem('routes', { ...data, id: generateId('r') }); 
-    else updateItem('routes', data); 
-    closeModal(); 
+    if (modal === 'add') addItem('routes', { ...data, id: generateId('r') });
+    else updateItem('routes', data);
+    closeModal();
   };
 
   const csvColumns = [
@@ -58,14 +58,14 @@ export default function Routes() {
     <div>
       <div className="page-header"><h1>Routes</h1>
         <div className="page-header-actions">
-          <button className="btn btn-secondary" onClick={() => exportToCSV(filtered, 'routes', csvColumns)}><Download size={16}/> Export</button>
-          {canEdit && <button className="btn btn-primary" onClick={openAdd}><Plus size={16}/> Add Route</button>}
+          <button className="btn btn-secondary" onClick={() => exportToCSV(filtered, 'routes', csvColumns)}><Download size={16} /> Export</button>
+          {canEdit && <button className="btn btn-primary" onClick={openAdd}><Plus size={16} /> Add Route</button>}
         </div>
       </div>
 
       <div className="table-container">
-        <div className="table-toolbar"><div className="table-toolbar-left"><div className="search-input"><Search size={15}/><input placeholder="Search routes..." value={search} onChange={e=>setSearch(e.target.value)}/></div></div></div>
-        <div style={{overflowX:'auto'}}>
+        <div className="table-toolbar"><div className="table-toolbar-left"><div className="search-input"><Search size={15} /><input placeholder="Search routes..." value={search} onChange={e => setSearch(e.target.value)} /></div></div></div>
+        <div style={{ overflowX: 'auto' }}>
           <table className="data-table">
             <thead><tr><th>Route</th><th>Distance</th><th>Est. Fuel</th>{showFinancials && <><th>Est. Fuel Cost</th><th>Est. Tolls</th></>}<th>Duration</th><th>Trips</th>{showFinancials && <><th>Total Profit</th><th>Avg Profit/Trip</th></>}<th>Actions</th></tr></thead>
             <tbody>{filtered.map(r => (
@@ -83,10 +83,10 @@ export default function Routes() {
                   <td className={`numeric ${r.profit >= 0 ? 'positive' : 'negative'}`}>{formatCurrency(r.profit)}</td>
                   <td className={`numeric ${r.avgProfit >= 0 ? 'positive' : 'negative'}`}>{formatCurrency(r.avgProfit)}</td>
                 </>}
-                <td><div style={{display:'flex',gap:4}}>
-                  {canEdit && <button className="btn-icon" onClick={()=>openEdit(r)}><Edit2 size={16}/></button>}
-                  {canEdit && <button className="btn-icon" onClick={()=>deleteItem('routes',r.id)}><Trash2 size={16}/></button>}
-                  {!canEdit && <span style={{fontSize:11,color:'var(--text-muted)'}}>View only</span>}
+                <td><div style={{ display: 'flex', gap: 4 }}>
+                  {canEdit && <button className="btn-icon" onClick={() => openEdit(r)}><Edit2 size={16} /></button>}
+                  {canEdit && <button className="btn-icon" onClick={() => deleteItem('routes', r.id)}><Trash2 size={16} /></button>}
+                  {!canEdit && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>View only</span>}
                 </div></td>
               </tr>
             ))}</tbody>
@@ -95,22 +95,22 @@ export default function Routes() {
         <div className="table-footer"><span>{filtered.length} routes</span></div>
       </div>
 
-      {canEdit && modal && <Modal title={modal==='add'?'Add Route':'Edit Route'} onClose={closeModal}
+      {canEdit && modal && <Modal title={modal === 'add' ? 'Add Route' : 'Edit Route'} onClose={closeModal}
         footer={<><button className="btn btn-secondary" onClick={closeModal}>Cancel</button><button className="btn btn-primary" onClick={save}>Save</button></>}>
         <div className="form-grid">
-          <div className="form-group full"><label className="form-label">Route Name</label><input className="form-input" value={form.name||''} onChange={e=>setForm({...form,name:e.target.value})} placeholder="e.g. JHB → Durban" /></div>
-          <div className="form-group"><label className="form-label">Origin</label><input className="form-input" value={form.origin||''} onChange={e=>setForm({...form,origin:e.target.value})}/></div>
-          <div className="form-group"><label className="form-label">Destination</label><input className="form-input" value={form.destination||''} onChange={e=>setForm({...form,destination:e.target.value})}/></div>
-          <div className="form-group"><label className="form-label">Distance (km)</label><input className="form-input" type="number" value={form.distance_km||''} onChange={e=>{
+          <div className="form-group full"><label className="form-label">Route Name</label><input className="form-input" value={form.name || ''} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. JHB → Durban" /></div>
+          <div className="form-group"><label className="form-label">Origin</label><input className="form-input" value={form.origin || ''} onChange={e => setForm({ ...form, origin: e.target.value })} /></div>
+          <div className="form-group"><label className="form-label">Destination</label><input className="form-input" value={form.destination || ''} onChange={e => setForm({ ...form, destination: e.target.value })} /></div>
+          <div className="form-group"><label className="form-label">Distance (km)</label><input className="form-input" type="number" value={form.distance_km || ''} onChange={e => {
             const dist = +e.target.value;
             const updates = { distance_km: e.target.value };
             if (form.consumption_rate) {
               updates.estimated_fuel_liters = (dist / 100) * form.consumption_rate;
               updates.estimated_fuel_cost = updates.estimated_fuel_liters * (fuelPrices?.diesel || 0);
             }
-            setForm({...form, ...updates});
-          }}/></div>
-          <div className="form-group"><label className="form-label">Ref. Vehicle (Calc)</label><select className="form-select" value={form.calc_vehicle_id||''} onChange={e=>{
+            setForm({ ...form, ...updates });
+          }} /></div>
+          <div className="form-group"><label className="form-label">Ref. Vehicle (Calc)</label><select className="form-select" value={form.calc_vehicle_id || ''} onChange={e => {
             const vid = e.target.value;
             const v = vehicles.find(x => x.id === vid);
             const rate = v?.avg_consumption_rate || 0;
@@ -120,16 +120,16 @@ export default function Routes() {
               updates.estimated_fuel_liters = (dist / 100) * rate;
               updates.estimated_fuel_cost = updates.estimated_fuel_liters * (fuelPrices?.diesel || 0);
             }
-            setForm({...form, ...updates});
-          }}><option value="">Select vehicle...</option>{vehicles.map(v=><option key={v.id} value={v.id}>{v.registration} ({v.avg_consumption_rate?v.avg_consumption_rate+' L/100km':'No rate'})</option>)}</select></div>
-          <div className="form-group"><label className="form-label">Est. Fuel (L)</label><input className="form-input" type="number" value={form.estimated_fuel_liters||''} onChange={e=>{
+            setForm({ ...form, ...updates });
+          }}><option value="">Select vehicle...</option>{vehicles.map(v => <option key={v.id} value={v.id}>{v.registration} ({v.avg_consumption_rate ? v.avg_consumption_rate + ' L/100km' : 'No rate'})</option>)}</select></div>
+          <div className="form-group"><label className="form-label">Est. Fuel (L)</label><input className="form-input" type="number" value={form.estimated_fuel_liters || ''} onChange={e => {
             const fuel = +e.target.value;
-            setForm({...form,estimated_fuel_liters:e.target.value, estimated_fuel_cost: fuel * (fuelPrices?.diesel || 0)});
-          }}/></div>
-          <div className="form-group"><label className="form-label">Est. Fuel Cost</label><input className="form-input" type="number" value={form.estimated_fuel_cost||''} onChange={e=>setForm({...form,estimated_fuel_cost:e.target.value})}/></div>
-          <div className="form-group"><label className="form-label">Est. Tolls</label><input className="form-input" type="number" value={form.estimated_tolls||''} onChange={e=>setForm({...form,estimated_tolls:e.target.value})}/></div>
-          <div className="form-group"><label className="form-label">Est. Duration (hrs)</label><input className="form-input" type="number" value={form.estimated_duration_hours||''} onChange={e=>setForm({...form,estimated_duration_hours:e.target.value})}/></div>
-          <div className="form-group full"><label className="form-label">Notes</label><textarea className="form-textarea" value={form.notes||''} onChange={e=>setForm({...form,notes:e.target.value})}/></div>
+            setForm({ ...form, estimated_fuel_liters: e.target.value, estimated_fuel_cost: fuel * (fuelPrices?.diesel || 0) });
+          }} /></div>
+          <div className="form-group"><label className="form-label">Est. Fuel Cost</label><input className="form-input" type="number" value={form.estimated_fuel_cost || ''} onChange={e => setForm({ ...form, estimated_fuel_cost: e.target.value })} /></div>
+          <div className="form-group"><label className="form-label">Est. Tolls</label><input className="form-input" type="number" value={form.estimated_tolls || ''} onChange={e => setForm({ ...form, estimated_tolls: e.target.value })} /></div>
+          <div className="form-group"><label className="form-label">Est. Duration (hrs)</label><input className="form-input" type="number" value={form.estimated_duration_hours || ''} onChange={e => setForm({ ...form, estimated_duration_hours: e.target.value })} /></div>
+          <div className="form-group full"><label className="form-label">Notes</label><textarea className="form-textarea" value={form.notes || ''} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
         </div>
       </Modal>}
     </div>

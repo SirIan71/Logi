@@ -155,7 +155,8 @@ async function main() {
       id: authData.user.id,
       auth_id: authData.user.id,
       email: ADMIN_EMAIL,
-      name: ADMIN_NAME,
+      first_name: 'Admin',
+      last_name: 'User',
       role: 'admin',
       is_active: true,
     });
@@ -166,7 +167,7 @@ async function main() {
     }
   } else {
     // Update the role to admin (trigger defaults may vary)
-    await supabase.from('users').update({ role: 'admin', name: ADMIN_NAME }).eq('id', profile.id);
+    await supabase.from('users').update({ role: 'admin', first_name: 'Admin', last_name: 'User' }).eq('id', profile.id);
     console.log(`   ✓ Profile exists: ${profile.email} (role: admin)`);
   }
 

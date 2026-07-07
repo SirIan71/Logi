@@ -24,7 +24,7 @@ export default function AuditLog() {
         <div className="page-header-actions">
           <button className="btn btn-secondary" onClick={() => exportToCSV(filtered, 'audit_logs', [
             { label: 'Timestamp', accessor: r => formatDateTime(r.created_at) },
-            { label: 'User', accessor: r => lookup('users', r.user_id)?.name || 'System' },
+            { label: 'User', accessor: r => { const u = lookup('users', r.user_id); return u ? `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.name || 'System' : 'System'; } },
             { label: 'Action', accessor: r => r.action },
             { label: 'Entity Type', accessor: r => r.entity_type },
             { label: 'Entity ID', accessor: r => r.entity_id },
@@ -52,7 +52,7 @@ export default function AuditLog() {
                 return (
                   <tr key={log.id}>
                     <td style={{whiteSpace:'nowrap'}}>{formatDateTime(log.created_at)}</td>
-                    <td className="primary">{user?.name || 'System'}</td>
+                    <td className="primary">{user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.name || 'System' : 'System'}</td>
                     <td><span style={{color: actionColors[log.action], fontWeight:600, textTransform:'uppercase', fontSize:11, letterSpacing:0.5}}>{log.action}</span></td>
                     <td><span style={{background:'var(--bg-input)',padding:'3px 8px',borderRadius:4,fontSize:12,fontWeight:500}}>{log.entity_type}</span> <span style={{color:'var(--text-muted)',fontSize:11}}>{log.entity_id}</span></td>
                     <td style={{maxWidth:300}}>

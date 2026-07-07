@@ -27,7 +27,8 @@ export default function Fleet() {
     const totalFuelCost = vFuel.reduce((s, f) => s + f.cost, 0);
     const docs = vehicleDocuments.filter(d => d.vehicle_id === v.id);
     const expiringDocs = docs.filter(d => daysUntil(d.expiry_date) <= 60);
-    return { ...v, tripCount: vTrips.length, totalFuelCost, driverName: driver?.name || 'Unassigned', nextService, expiringDocs };
+    const driverName = driver ? `${driver.first_name || ''} ${driver.last_name || ''}`.trim() || driver.name || 'Unassigned' : 'Unassigned';
+    return { ...v, tripCount: vTrips.length, totalFuelCost, driverName, nextService, expiringDocs };
   }), [vehicles, trips, fuelRecords, maintenance, vehicleDocuments, lookup]);
 
   const filteredVehicles = useMemo(() => searchFilter(vehicleStats, search, ['registration', 'make', 'model', 'driverName']), [vehicleStats, search]);
@@ -190,7 +191,7 @@ export default function Fleet() {
           <div className="form-group"><label className="form-label">Odometer (km)</label><input className="form-input" type="number" value={form.current_odometer||''} onChange={e=>setForm({...form,current_odometer:e.target.value})}/></div>
           <div className="form-group"><label className="form-label">Tank (L)</label><input className="form-input" type="number" value={form.tank_capacity_liters||''} onChange={e=>setForm({...form,tank_capacity_liters:e.target.value})}/></div>
           <div className="form-group"><label className="form-label">Assigned Driver</label>
-            <select className="form-select" value={form.assigned_driver_id||''} onChange={e=>setForm({...form,assigned_driver_id:e.target.value||null})}><option value="">Unassigned</option>{drivers.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
+            <select className="form-select" value={form.assigned_driver_id||''} onChange={e=>setForm({...form,assigned_driver_id:e.target.value||null})}><option value="">Unassigned</option>{drivers.map(d=><option key={d.id} value={d.id}>{`${d.first_name || ''} ${d.last_name || ''}`.trim() || d.name}</option>)}</select></div>
           <div className="form-group"><label className="form-label">Avg Consumption (L/100km)</label><input className="form-input" type="number" step="0.1" placeholder="e.g. 35.0" value={form.avg_consumption_rate||''} onChange={e=>setForm({...form,avg_consumption_rate:e.target.value})}/></div>
           <div className="form-group"><label className="form-label">Status</label><select className="form-select" value={form.status||'active'} onChange={e=>setForm({...form,status:e.target.value})}><option value="active">Active</option><option value="maintenance">In Maintenance</option><option value="decommissioned">Decommissioned</option></select></div>
         </div>

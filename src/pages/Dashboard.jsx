@@ -48,7 +48,7 @@ function DriverDashboard() {
     <>
       <div className="flex justify-between items-end">
         <div>
-          <h2 className="text-3xl font-headline font-extrabold text-primary">Welcome, {user?.name?.split(' ')[0]}</h2>
+          <h2 className="text-3xl font-headline font-extrabold text-primary">Welcome, {user?.first_name || user?.name?.split(' ')[0]}</h2>
           <p className="text-on-surface-variant font-body">Your personal driver dashboard.</p>
         </div>
       </div>
