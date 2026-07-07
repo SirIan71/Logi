@@ -15,7 +15,14 @@ export default function AuditLog() {
     return searchFilter(data, search, ['entity_type', 'action']).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   }, [auditLogs, search, entityFilter]);
 
-  const actionColors = { create: 'var(--color-success)', update: 'var(--color-info)', delete: 'var(--color-danger)' };
+  const actionColors = {
+    create: 'var(--color-success)',
+    update: 'var(--color-info)',
+    delete: 'var(--color-danger)',
+    login: 'var(--color-purple)',
+    logout: 'var(--text-muted)',
+    view: 'var(--color-accent)'
+  };
 
   return (
     <div>
@@ -53,12 +60,18 @@ export default function AuditLog() {
                   <tr key={log.id}>
                     <td style={{whiteSpace:'nowrap'}}>{formatDateTime(log.created_at)}</td>
                     <td className="primary">{user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.name || 'System' : 'System'}</td>
-                    <td><span style={{color: actionColors[log.action], fontWeight:600, textTransform:'uppercase', fontSize:11, letterSpacing:0.5}}>{log.action}</span></td>
+                    <td><span style={{color: actionColors[log.action] || 'var(--text-secondary)', fontWeight:600, textTransform:'uppercase', fontSize:11, letterSpacing:0.5}}>{log.action}</span></td>
                     <td><span style={{background:'var(--bg-input)',padding:'3px 8px',borderRadius:4,fontSize:12,fontWeight:500}}>{log.entity_type}</span> <span style={{color:'var(--text-muted)',fontSize:11}}>{log.entity_id}</span></td>
                     <td style={{maxWidth:300}}>
-                      {log.new_values && <span style={{fontSize:12,color:'var(--text-secondary)'}}>
-                        {Object.entries(log.new_values).map(([k, v]) => <span key={k} style={{display:'inline-block',marginRight:8}}><span style={{color:'var(--text-muted)'}}>{k}:</span> <span style={{fontWeight:500}}>{String(v)}</span></span>)}
-                      </span>}
+                      {log.new_values && typeof log.new_values === 'object' && (
+                        <span style={{fontSize:12,color:'var(--text-secondary)'}}>
+                          {Object.entries(log.new_values).map(([k, v]) => (
+                            <span key={k} style={{display:'inline-block',marginRight:8}}>
+                              <span style={{color:'var(--text-muted)'}}>{k}:</span> <span style={{fontWeight:500}}>{typeof v === 'object' ? JSON.stringify(v) : String(v)}</span>
+                            </span>
+                          ))}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 );

@@ -1,11 +1,41 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
+import { useApp } from '../../context/AppContext';
+
+const PAGE_NAMES = {
+  '/': 'Dashboard',
+  '/trips': 'Trips',
+  '/routes': 'Routes',
+  '/fleet': 'Fleet',
+  '/drivers': 'Drivers',
+  '/clients': 'Clients',
+  '/income': 'Income',
+  '/fuel': 'Fuel',
+  '/expenses': 'Expenses',
+  '/reports': 'Reports',
+  '/audit-log': 'Audit Log',
+  '/settings': 'Settings'
+};
 
 export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const { writeAuditLog, user } = useApp();
+
+  useEffect(() => {
+    if (user && writeAuditLog) {
+      const pageName = PAGE_NAMES[location.pathname] || 'Page';
+      writeAuditLog({
+        action: 'view',
+        entityType: 'Page',
+        entityId: location.pathname,
+        oldValues: null,
+        newValues: { page: pageName }
+      });
+    }
+  }, [location.pathname, user, writeAuditLog]);
 
   return (
     <>

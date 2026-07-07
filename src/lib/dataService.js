@@ -39,7 +39,7 @@ const COLUMN_WHITELIST = {
   fuel_records:       ['id', 'vehicle_id', 'trip_id', 'recorded_by', 'liters', 'cost', 'odometer_reading', 'station', 'date', 'created_at'],
   maintenance:        ['id', 'vehicle_id', 'type', 'service_type', 'description', 'cost', 'service_date', 'odometer_at_service', 'next_due_km', 'next_due_date', 'vendor', 'notes', 'created_at'],
   vehicle_documents:  ['id', 'vehicle_id', 'doc_type', 'issue_date', 'expiry_date', 'notes'],
-  audit_logs:         ['id', 'user_id', 'entity_type', 'entity_id', 'action', 'old_values', 'new_values', 'ip_address', 'created_at'],
+  audit_logs:         ['id', 'user_id', 'entity_type', 'entity_id', 'action', 'old_values', 'new_values', 'created_at'],
 };
 
 /**

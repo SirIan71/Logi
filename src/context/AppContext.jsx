@@ -155,6 +155,26 @@ export function AppProvider({ children }) {
         dispatch({ type: 'LOGIN', payload: userRecord });
         // After login, RLS is now active for this user — load all data
         await loadAllCollections(dispatch);
+
+        // Audit log login
+        const logId = 'al_' + Math.random().toString(36).substr(2, 9);
+        const logRecord = {
+          id: logId,
+          user_id: userRecord.id,
+          entity_type: 'Auth',
+          entity_id: userRecord.id,
+          action: 'login',
+          old_values: null,
+          new_values: { email: userRecord.email },
+          created_at: new Date().toISOString()
+        };
+        try {
+          await insert('auditLogs', logRecord);
+          dispatch({ type: 'ADD_ITEM', collection: 'auditLogs', payload: logRecord });
+        } catch (logErr) {
+          console.error('[SIRIAN DB] Failed to write login audit log:', logErr);
+        }
+
         return true;
       }
       return false;
@@ -165,9 +185,29 @@ export function AppProvider({ children }) {
   }, []);
 
   const logout = useCallback(async () => {
+    const loggingUser = state.user;
     await db.auth.signOut();
     dispatch({ type: 'LOGOUT' });
-  }, []);
+
+    if (loggingUser) {
+      const logId = 'al_' + Math.random().toString(36).substr(2, 9);
+      const logRecord = {
+        id: logId,
+        user_id: loggingUser.id,
+        entity_type: 'Auth',
+        entity_id: loggingUser.id,
+        action: 'logout',
+        old_values: null,
+        new_values: { email: loggingUser.email },
+        created_at: new Date().toISOString()
+      };
+      try {
+        await insert('auditLogs', logRecord);
+      } catch (logErr) {
+        console.error('[SIRIAN DB] Failed to write logout audit log:', logErr);
+      }
+    }
+  }, [state.user]);
 
   const toggleSidebar = useCallback(() => dispatch({ type: 'TOGGLE_SIDEBAR' }), []);
 
@@ -199,42 +239,95 @@ export function AppProvider({ children }) {
     return labels[col] || col;
   };
 
+  // ── Generic Audit Logging Function ─────────────────────────────────────
+  const writeAuditLog = useCallback(async ({ action, entityType, entityId, oldValues, newValues }) => {
+    try {
+      const logId = 'al_' + Math.random().toString(36).substr(2, 9);
+      const logRecord = {
+        id: logId,
+        user_id: state.user?.id || null,
+        entity_type: entityType,
+        entity_id: entityId || null,
+        action,
+        old_values: oldValues || null,
+        new_values: newValues || null,
+        created_at: new Date().toISOString()
+      };
+      await insert('auditLogs', logRecord);
+      dispatch({ type: 'ADD_ITEM', collection: 'auditLogs', payload: logRecord });
+    } catch (err) {
+      console.error('[SIRIAN DB] Failed to write audit log:', err);
+    }
+  }, [state.user]);
+
   // ── CRUD — writes to Supabase first, then updates React state ──────────
   const addItem = useCallback(async (collection, item) => {
     try {
       await insert(collection, item);
       dispatch({ type: 'ADD_ITEM', collection, payload: item });
       showToast(`${getCollectionLabel(collection)} added successfully!`, 'success');
+
+      if (collection !== 'auditLogs') {
+        await writeAuditLog({
+          action: 'create',
+          entityType: getCollectionLabel(collection),
+          entityId: item.id,
+          oldValues: null,
+          newValues: item
+        });
+      }
     } catch (err) {
       console.error(`[SIRIAN DB] Failed to add to ${collection}:`, err);
       showToast(`Failed to add ${getCollectionLabel(collection).toLowerCase()}.`, 'error');
     }
-  }, [showToast]);
+  }, [showToast, writeAuditLog]);
 
   const updateItem = useCallback(async (collection, item) => {
     try {
       const { id, ...changes } = item;
+      const oldItem = state[collection]?.find(i => i.id === id) || null;
       await dbUpdate(collection, id, changes);
       dispatch({ type: 'UPDATE_ITEM', collection, payload: item });
       showToast(`${getCollectionLabel(collection)} updated successfully!`, 'success');
+
+      if (collection !== 'auditLogs') {
+        await writeAuditLog({
+          action: 'update',
+          entityType: getCollectionLabel(collection),
+          entityId: id,
+          oldValues: oldItem,
+          newValues: item
+        });
+      }
     } catch (err) {
       console.error(`[SIRIAN DB] Failed to update ${collection}:`, err);
       showToast(`Failed to update ${getCollectionLabel(collection).toLowerCase()}.`, 'error');
     }
-  }, [showToast]);
+  }, [showToast, writeAuditLog, state]);
 
   const deleteItem = useCallback(async (collection, id) => {
     if (window.confirm('Are you sure you want to delete this record?')) {
       try {
+        const oldItem = state[collection]?.find(i => i.id === id) || null;
         await dbRemove(collection, id);
         dispatch({ type: 'DELETE_ITEM', collection, payload: { id } });
         showToast(`${getCollectionLabel(collection)} deleted successfully!`, 'success');
+
+        if (collection !== 'auditLogs') {
+          await writeAuditLog({
+            action: 'delete',
+            entityType: getCollectionLabel(collection),
+            entityId: id,
+            oldValues: oldItem,
+            newValues: null
+          });
+        }
       } catch (err) {
         console.error(`[SIRIAN DB] Failed to delete from ${collection}:`, err);
         showToast(`Failed to delete ${getCollectionLabel(collection).toLowerCase()}.`, 'error');
       }
     }
-  }, [showToast]);
+  }, [showToast, writeAuditLog, state]);
 
   const lookup = useCallback((collection, id) => state[collection]?.find(i => i.id === id), [state]);
 
