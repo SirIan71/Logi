@@ -50,13 +50,13 @@ export default function Trips() {
   const openView = (t) => { setSelected(t); setModal('view'); };
   const closeModal = () => { setModal(null); setSelected(null); setForm({}); };
 
-  const saveTrip = () => {
+  const saveTrip = async () => {
     let tripId = form.id;
     if (modal === 'add') {
       tripId = generateId('t');
-      addItem('trips', { ...form, id: tripId });
+      await addItem('trips', { ...form, id: tripId });
     } else {
-      updateItem('trips', form);
+      await updateItem('trips', form);
     }
 
     if (form.status === 'completed' && form.vehicle_id && form.route_id) {
@@ -70,7 +70,13 @@ export default function Trips() {
         const fuel = rate ? (dist / 100) * rate : (r?.estimated_fuel_liters || 0);
         
         if (fuel > 0) {
-          addItem('fuelRecords', {
+          const newOdo = (v?.current_odometer || 0) + dist;
+          // Update vehicle's odometer
+          if (v) {
+            await updateItem('vehicles', { ...v, current_odometer: newOdo });
+          }
+
+          await addItem('fuelRecords', {
             id: generateId('f'),
             vehicle_id: form.vehicle_id,
             trip_id: tripId,
@@ -78,7 +84,7 @@ export default function Trips() {
             cost: fuel * (fuelPrices?.diesel || 0),
             date: new Date().toISOString().split('T')[0],
             station: `Est: Trip ${form.origin} → ${form.destination}`,
-            odometer_reading: v?.current_odometer || 0,
+            odometer_reading: newOdo,
             recorded_by: user?.id
           });
         }

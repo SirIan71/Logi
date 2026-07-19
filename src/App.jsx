@@ -15,6 +15,7 @@ import Reports from './pages/Reports';
 import AuditLog from './pages/AuditLog';
 import Settings from './pages/Settings';
 import Drivers from './pages/Drivers';
+import SessionTimeout from './components/common/SessionTimeout';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Analytics } from '@vercel/analytics/react';
 
@@ -37,6 +38,7 @@ function AppRoutes() {
 
   return (
     <BrowserRouter>
+      <SessionTimeout />
       <Routes>
         <Route element={<Layout />}>
           {/* Dashboard is always accessible (driver gets personal view) */}
