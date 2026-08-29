@@ -24,9 +24,15 @@ export function printInvoice(invoice, client, tripDetails, options = {}) {
 
   const rateTypeLabel = client?.rate_type === 'per_ton' ? 'Per Ton' : 'Per Trip';
   const rateAmount = client?.rate_amount || 0;
-  const invoiceMonth = invoice.invoice_month
-    ? new Date(invoice.invoice_month + '-01').toLocaleDateString('en-UK', { month: 'long', year: 'numeric' })
-    : '—';
+  const formatInvoiceMonth = (mStr) => {
+    if (!mStr) return '—';
+    if (typeof mStr === 'string' && mStr.includes('-')) {
+      const [y, m] = mStr.split('-').map(Number);
+      if (y && m) return new Date(y, m - 1, 1).toLocaleDateString('en-UK', { month: 'long', year: 'numeric' });
+    }
+    return mStr;
+  };
+  const invoiceMonth = formatInvoiceMonth(invoice.invoice_month);
 
   // Build line items from trip details
   const lineItems = (tripDetails || invoice.trip_details || []).map((t, idx) => {
@@ -598,13 +604,21 @@ export function printInvoice(invoice, client, tripDetails, options = {}) {
       </div>
     </div>
   </div>
+  <script>
+    window.onload = function() {
+      setTimeout(function() { window.print(); }, 300);
+    };
+  </script>
 </body>
 </html>`;
 
-  const printWindow = window.open('', '_blank', 'width=900,height=1100');
+  const printWindow = window.open('', '_blank', 'width=950,height=1150');
   if (printWindow) {
     printWindow.document.write(html);
     printWindow.document.close();
+    printWindow.focus();
+  } else {
+    alert('Pop-up blocked. Please allow pop-ups for this browser window to view/print invoices.');
   }
 }
 
@@ -637,9 +651,11 @@ export default function InvoicePreview({ invoice, client, tripDetails }) {
         <div>
           <div style={{ fontWeight: 800, fontSize: 18, color: '#003539' }}>{invoice?.invoice_number}</div>
           <div style={{ fontSize: 12, color: '#70797A' }}>
-            {invoice?.invoice_month
-              ? new Date(invoice.invoice_month + '-01').toLocaleDateString('en-UK', { month: 'long', year: 'numeric' })
-              : '—'}
+            {invoice?.invoice_month ? (
+              invoice.invoice_month.includes('-')
+                ? new Date(Number(invoice.invoice_month.split('-')[0]), Number(invoice.invoice_month.split('-')[1]) - 1, 1).toLocaleDateString('en-UK', { month: 'long', year: 'numeric' })
+                : invoice.invoice_month
+            ) : '—'}
           </div>
         </div>
         <div style={{

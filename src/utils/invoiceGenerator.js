@@ -60,11 +60,12 @@ export function generateInvoices(invoiceableMonths, clients, existingIncomeCount
     }
 
     // Due date: payment_terms_days after month end
-    const monthEnd = new Date(cm.month + '-01');
-    monthEnd.setMonth(monthEnd.getMonth() + 1);
-    monthEnd.setDate(0); // Last day of the invoice month
+    const [y, m] = cm.month.split('-').map(Number);
+    const monthEnd = new Date(y, m, 0); // Last day of month m in year y
     const dueDate = new Date(monthEnd);
     dueDate.setDate(dueDate.getDate() + (client.payment_terms_days || 30));
+
+    const monthLabel = new Date(y, m - 1, 1).toLocaleDateString('en-UK', { month: 'long', year: 'numeric' });
 
     return {
       id: generateId('i'),
@@ -77,7 +78,7 @@ export function generateInvoices(invoiceableMonths, clients, existingIncomeCount
       payment_status: 'unpaid',
       payment_date: null,
       due_date: dueDate.toISOString().split('T')[0],
-      notes: `Auto-generated invoice for ${cm.trips.length} trip(s) in ${new Date(cm.month + '-01').toLocaleDateString('en-UK', { month: 'long', year: 'numeric' })}`,
+      notes: `Auto-generated invoice for ${cm.trips.length} trip(s) in ${monthLabel}`,
       generated_at: new Date().toISOString(),
       trip_details: cm.trips.map(t => ({
         trip_id: t.id,

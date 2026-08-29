@@ -64,18 +64,18 @@ const trips = [
 ];
 
 const income = [
-  { id: 'i1', trip_id: 't1', client_id: 'c1', invoice_number: 'INV-2026-001', amount: 45000, amount_paid: 45000, payment_status: 'paid', payment_date: '2026-03-20', due_date: '2026-04-15' },
-  { id: 'i2', trip_id: 't2', client_id: 'c2', invoice_number: 'INV-2026-002', amount: 85000, amount_paid: 85000, payment_status: 'paid', payment_date: '2026-03-25', due_date: '2026-03-30' },
-  { id: 'i3', trip_id: 't3', client_id: 'c3', invoice_number: 'INV-2026-003', amount: 52000, amount_paid: 30000, payment_status: 'partially_paid', payment_date: '2026-03-28', due_date: '2026-04-18' },
-  { id: 'i4', trip_id: 't4', client_id: 'c4', invoice_number: 'INV-2026-004', amount: 42000, amount_paid: 42000, payment_status: 'paid', payment_date: '2026-03-28', due_date: '2026-04-10' },
-  { id: 'i5', trip_id: 't5', client_id: 'c1', invoice_number: 'INV-2026-005', amount: 28000, amount_paid: 0, payment_status: 'unpaid', payment_date: null, due_date: '2026-04-20' },
-  { id: 'i6', trip_id: 't6', client_id: 'c2', invoice_number: 'INV-2026-006', amount: 55000, amount_paid: 55000, payment_status: 'paid', payment_date: '2026-04-01', due_date: '2026-04-05' },
-  { id: 'i7', trip_id: 't7', client_id: 'c4', invoice_number: 'INV-2026-007', amount: 32000, amount_paid: 15000, payment_status: 'partially_paid', payment_date: '2026-04-01', due_date: '2026-04-13' },
-  { id: 'i8', trip_id: 't8', client_id: 'c3', invoice_number: 'INV-2026-008', amount: 78000, amount_paid: 0, payment_status: 'unpaid', payment_date: null, due_date: '2026-04-25' },
-  { id: 'i9', trip_id: 't9', client_id: 'c1', invoice_number: 'INV-2026-009', amount: 44000, amount_paid: 44000, payment_status: 'paid', payment_date: '2026-04-02', due_date: '2026-04-27' },
-  { id: 'i10', trip_id: 't10', client_id: 'c5', invoice_number: 'INV-2026-010', amount: 61000, amount_paid: 0, payment_status: 'unpaid', payment_date: null, due_date: '2026-04-28' },
-  { id: 'i11', trip_id: 't11', client_id: 'c3', invoice_number: 'INV-2026-011', amount: 50000, amount_paid: 0, payment_status: 'unpaid', payment_date: null, due_date: '2026-04-30' },
-  { id: 'i12', trip_id: 't12', client_id: 'c4', invoice_number: 'INV-2026-012', amount: 26000, amount_paid: 0, payment_status: 'unpaid', payment_date: null, due_date: '2026-04-30' },
+  { id: 'i1', trip_id: 't1', client_id: 'c1', invoice_number: 'INV-2026-001', invoice_month: '2026-03', amount: 45000, amount_paid: 45000, payment_status: 'paid', payment_date: '2026-03-20', due_date: '2026-04-15' },
+  { id: 'i2', trip_id: 't2', client_id: 'c2', invoice_number: 'INV-2026-002', invoice_month: '2026-03', amount: 85000, amount_paid: 85000, payment_status: 'paid', payment_date: '2026-03-25', due_date: '2026-03-30' },
+  { id: 'i3', trip_id: 't3', client_id: 'c3', invoice_number: 'INV-2026-003', invoice_month: '2026-03', amount: 52000, amount_paid: 30000, payment_status: 'partially_paid', payment_date: '2026-03-28', due_date: '2026-04-18' },
+  { id: 'i4', trip_id: 't4', client_id: 'c4', invoice_number: 'INV-2026-004', invoice_month: '2026-03', amount: 42000, amount_paid: 42000, payment_status: 'paid', payment_date: '2026-03-28', due_date: '2026-04-10' },
+  { id: 'i5', trip_id: 't5', client_id: 'c1', invoice_number: 'INV-2026-005', invoice_month: '2026-03', amount: 28000, amount_paid: 0, payment_status: 'unpaid', payment_date: null, due_date: '2026-04-20' },
+  { id: 'i6', trip_id: 't6', client_id: 'c2', invoice_number: 'INV-2026-006', invoice_month: '2026-03', amount: 55000, amount_paid: 55000, payment_status: 'paid', payment_date: '2026-04-01', due_date: '2026-04-05' },
+  { id: 'i7', trip_id: 't7', client_id: 'c4', invoice_number: 'INV-2026-007', invoice_month: '2026-03', amount: 32000, amount_paid: 15000, payment_status: 'partially_paid', payment_date: '2026-04-01', due_date: '2026-04-13' },
+  { id: 'i8', trip_id: 't8', client_id: 'c3', invoice_number: 'INV-2026-008', invoice_month: '2026-03', amount: 78000, amount_paid: 0, payment_status: 'unpaid', payment_date: null, due_date: '2026-04-25' },
+  { id: 'i9', trip_id: 't9', client_id: 'c1', invoice_number: 'INV-2026-009', invoice_month: '2026-03', amount: 44000, amount_paid: 44000, payment_status: 'paid', payment_date: '2026-04-02', due_date: '2026-04-27' },
+  { id: 'i10', trip_id: 't10', client_id: 'c5', invoice_number: 'INV-2026-010', invoice_month: '2026-03', amount: 61000, amount_paid: 0, payment_status: 'unpaid', payment_date: null, due_date: '2026-04-28' },
+  { id: 'i11', trip_id: 't11', client_id: 'c3', invoice_number: 'INV-2026-011', invoice_month: '2026-03', amount: 50000, amount_paid: 0, payment_status: 'unpaid', payment_date: null, due_date: '2026-04-30' },
+  { id: 'i12', trip_id: 't12', client_id: 'c4', invoice_number: 'INV-2026-012', invoice_month: '2026-03', amount: 26000, amount_paid: 0, payment_status: 'unpaid', payment_date: null, due_date: '2026-04-30' },
 ];
 
 const expenseCategories = [

@@ -104,9 +104,25 @@ export default function Income() {
     { label: 'Status', accessor: r => r.payment_status }, { label: 'Due Date', accessor: r => r.due_date },
   ]);
 
+  const getTripDetailsForInvoice = (inv) => {
+    if (!inv) return [];
+    if (inv.trip_details && inv.trip_details.length > 0) {
+      return inv.trip_details;
+    }
+    if (inv.invoice_month) {
+      const monthTrips = trips.filter(t => t.client_id === inv.client_id && t.departure_date?.startsWith(inv.invoice_month));
+      if (monthTrips.length > 0) return monthTrips;
+    }
+    if (inv.trip_id) {
+      const singleTrip = trips.find(t => t.id === inv.trip_id);
+      if (singleTrip) return [singleTrip];
+    }
+    return [];
+  };
+
   const handlePrint = (inv) => {
     const client = lookup('clients', inv.client_id);
-    const tripDetails = inv.trip_details || trips.filter(t => t.client_id === inv.client_id && t.departure_date?.startsWith(inv.invoice_month));
+    const tripDetails = getTripDetailsForInvoice(inv);
     printInvoice(inv, client, tripDetails);
   };
 
@@ -227,7 +243,7 @@ export default function Income() {
                   <tr key={i.id}>
                     <td className="primary">{i.invoice_number}</td>
                     <td>{lookup('clients', i.client_id)?.company_name || '—'}</td>
-                    <td>{i.invoice_month ? new Date(i.invoice_month + '-01').toLocaleDateString('en-ZA', {month: 'short', year: 'numeric'}) : (trip ? `${trip.origin}→${trip.destination}` : '—')}</td>
+                    <td>{i.invoice_month ? (i.invoice_month.includes('-') ? new Date(Number(i.invoice_month.split('-')[0]), Number(i.invoice_month.split('-')[1]) - 1, 1).toLocaleDateString('en-ZA', {month: 'short', year: 'numeric'}) : i.invoice_month) : (trip ? `${trip.origin}→${trip.destination}` : '—')}</td>
                     <td className="numeric">{formatCurrency(i.amount)}</td>
                     <td className="numeric positive">{formatCurrency(i.amount_paid)}</td>
                     <td className="numeric negative">{formatCurrency(i.amount - i.amount_paid)}</td>
@@ -302,9 +318,7 @@ export default function Income() {
         <InvoicePreview
           invoice={previewInvoice}
           client={lookup('clients', previewInvoice.client_id)}
-          tripDetails={previewInvoice.trip_details || trips.filter(t =>
-            t.client_id === previewInvoice.client_id && t.departure_date?.startsWith(previewInvoice.invoice_month)
-          )}
+          tripDetails={getTripDetailsForInvoice(previewInvoice)}
         />
       </Modal>}
 

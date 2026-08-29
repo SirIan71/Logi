@@ -80,12 +80,15 @@ CREATE TABLE IF NOT EXISTS income (
   trip_id TEXT REFERENCES trips(id) ON DELETE SET NULL,
   client_id TEXT REFERENCES clients(id) ON DELETE SET NULL,
   invoice_number TEXT,
+  invoice_month TEXT,
   amount NUMERIC,
   amount_paid NUMERIC,
   payment_status TEXT,
   payment_date TEXT,
   due_date TEXT,
   notes TEXT,
+  generated_at TIMESTAMP,
+  trip_details JSONB,
   created_at TIMESTAMP
 );
 
