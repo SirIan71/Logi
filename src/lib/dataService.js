@@ -108,6 +108,20 @@ export async function getById(collection, id) {
   return data;
 }
 
+const CORE_INCOME_COLUMNS = new Set([
+  'id', 'trip_id', 'client_id', 'invoice_number', 'amount', 'amount_paid',
+  'payment_status', 'payment_date', 'due_date', 'notes', 'created_at'
+]);
+
+function getCoreClean(table, clean) {
+  if (table !== 'income') return clean;
+  const fallback = {};
+  for (const k in clean) {
+    if (CORE_INCOME_COLUMNS.has(k)) fallback[k] = clean[k];
+  }
+  return fallback;
+}
+
 /**
  * Insert a new record (or replace if same PK exists).
  * @param {string} collection
@@ -120,6 +134,12 @@ export async function insert(collection, data) {
   const { error } = await db.from(table).upsert(clean);
   if (error) {
     console.error(`Error inserting into ${table}:`, error.message);
+    if (table === 'income' && (error.code === 'PGRST204' || error.code === '42703' || error.message?.includes('column') || error.message?.includes('schema'))) {
+      console.warn(`[SIRIAN DB] Retrying insert into ${table} with core columns...`);
+      const coreClean = getCoreClean(table, clean);
+      const { error: retryErr } = await db.from(table).upsert(coreClean);
+      if (!retryErr) return data.id;
+    }
     throw error;
   }
   return data.id;
@@ -135,13 +155,17 @@ export async function insert(collection, data) {
 export async function update(collection, id, changes) {
   const table = tableName(collection);
   const clean = sanitize(table, changes);
-  const { error, count } = await db.from(table).update(clean).eq('id', id);
+  const { error } = await db.from(table).update(clean).eq('id', id);
   if (error) {
     console.error(`Error updating ${id} in ${table}:`, error.message);
+    if (table === 'income' && (error.code === 'PGRST204' || error.code === '42703' || error.message?.includes('column') || error.message?.includes('schema'))) {
+      console.warn(`[SIRIAN DB] Retrying update in ${table} with core columns...`);
+      const coreClean = getCoreClean(table, clean);
+      const { error: retryErr } = await db.from(table).update(coreClean).eq('id', id);
+      if (!retryErr) return 1;
+    }
     throw error;
   }
-  // Supabase doesn't return count by default without `{ count: 'exact' }`, 
-  // but keeping signature similar is fine.
   return 1;
 }
 

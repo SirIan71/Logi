@@ -260,11 +260,13 @@ export function AppProvider({ children }) {
     }
   }, [state.user]);
 
-  // ── CRUD — writes to Supabase first, then updates React state ──────────
+  // ── CRUD — updates React state immediately, then syncs to Supabase ──────────
   const addItem = useCallback(async (collection, item) => {
+    // Optimistically place record into React state & UI tables
+    dispatch({ type: 'ADD_ITEM', collection, payload: item });
+
     try {
       await insert(collection, item);
-      dispatch({ type: 'ADD_ITEM', collection, payload: item });
       showToast(`${getCollectionLabel(collection)} added successfully!`, 'success');
 
       if (collection !== 'auditLogs') {
@@ -277,8 +279,8 @@ export function AppProvider({ children }) {
         });
       }
     } catch (err) {
-      console.error(`[SIRIAN DB] Failed to add to ${collection}:`, err);
-      showToast(`Failed to add ${getCollectionLabel(collection).toLowerCase()}.`, 'error');
+      console.error(`[SIRIAN DB] Failed to sync ${collection} to Supabase:`, err);
+      showToast(`Added to ${getCollectionLabel(collection).toLowerCase()} table locally, sync issue logged.`, 'info');
     }
   }, [showToast, writeAuditLog]);
 

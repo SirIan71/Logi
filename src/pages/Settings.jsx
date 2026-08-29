@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { usePermission } from '../hooks/usePermission';
-import { Shield, Users, Database, Palette, Bell, Check, X, UserPlus } from 'lucide-react';
+import { Shield, Users, Database, Palette, Bell, Check, X, UserPlus, CreditCard, Save } from 'lucide-react';
 import db from '../lib/db.js';
 
 export default function Settings() {
@@ -12,6 +12,7 @@ export default function Settings() {
   // Build sections list based on role
   const allSections = [
     { icon: Users, title: 'User Management', desc: 'Manage users, roles, and permissions', badge: 'Admin Only', adminOnly: true },
+    { icon: CreditCard, title: 'Account Payment Information', desc: 'Manage bank account and M-Pesa remittance details for invoices', badge: null, adminOnly: false },
     { icon: Database, title: 'Data Management', desc: 'Backup, export, and import company data', badge: null, adminOnly: true },
     { icon: Palette, title: 'Appearance', desc: 'Theme, language, and display preferences', badge: null, adminOnly: false },
     { icon: Bell, title: 'Notifications', desc: 'Configure email and telegram notifications', badge: null, adminOnly: false },
@@ -27,6 +28,29 @@ export default function Settings() {
   const [teleId, setTeleId] = useState('');
   const [passwordMinLength, setPasswordMinLength] = useState(8);
   const [requireSpecialChar, setRequireSpecialChar] = useState(true);
+
+  const savedPayment = (() => {
+    try {
+      const raw = localStorage.getItem('sirian_payment_info');
+      return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+  })();
+
+  const [bankName, setBankName] = useState(savedPayment.bankName || 'Equity Bank Kenya');
+  const [bankAccountName, setBankAccountName] = useState(savedPayment.bankAccountName || 'Nory Logistics Ltd');
+  const [bankAccountNumber, setBankAccountNumber] = useState(savedPayment.bankAccountNumber || '0112 3948 5710 92');
+  const [swiftCode, setSwiftCode] = useState(savedPayment.swiftCode || 'EQBLKENA');
+  const [branch, setBranch] = useState(savedPayment.branch || 'Nairobi Main Branch');
+  const [mpesaPaybill, setMpesaPaybill] = useState(savedPayment.mpesaPaybill || '247247');
+  const [mpesaAccount, setMpesaAccount] = useState(savedPayment.mpesaAccount || 'NORY LOGISTICS');
+
+  const savePaymentSettings = () => {
+    const info = {
+      bankName, bankAccountName, bankAccountNumber, swiftCode, branch, mpesaPaybill, mpesaAccount
+    };
+    localStorage.setItem('sirian_payment_info', JSON.stringify(info));
+    alert('Payment & Bank Account information saved successfully! These details will appear on all generated invoice PDFs and previews.');
+  };
 
   // ── Invite User state ──────────────────────────────────────────────────
   const [inviteName, setInviteName] = useState('');
@@ -142,6 +166,55 @@ export default function Settings() {
                   <button onClick={() => applyTheme('lighttheme')} className="btn" style={{border: `2px solid ${theme==='lighttheme'?'var(--color-accent)':'var(--border-color)'}`}}>Standard Light</button>
                   <button onClick={() => applyTheme('nature')} className="btn" style={{border: `2px solid ${theme==='nature'?'#2b4d24':'var(--border-color)'}`}}>Nature (Forest Green)</button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'Account Payment Information' && (
+            <div className="form-grid" style={{maxWidth: 600}}>
+              <div style={{gridColumn:'1/-1', marginBottom: 12, padding: 14, borderRadius: 10, background: '#F0F9FA', border: '1px solid #003539', color: '#003539', fontSize: 13}}>
+                <strong>Account Payment Information:</strong> Configure your company's bank account & remittance details. These details will be printed on all generated client invoice PDFs and preview modals.
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Bank Name</label>
+                <input className="form-input" value={bankName} onChange={e => setBankName(e.target.value)} placeholder="e.g. Equity Bank Kenya" />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Account Name</label>
+                <input className="form-input" value={bankAccountName} onChange={e => setBankAccountName(e.target.value)} placeholder="e.g. Nory Logistics Ltd" />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Bank Account / Card Number</label>
+                <input className="form-input" value={bankAccountNumber} onChange={e => setBankAccountNumber(e.target.value)} placeholder="e.g. 0112 3948 5710 92" />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Branch Name</label>
+                <input className="form-input" value={branch} onChange={e => setBranch(e.target.value)} placeholder="e.g. Nairobi Main Branch" />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">SWIFT / BIC Code</label>
+                <input className="form-input" value={swiftCode} onChange={e => setSwiftCode(e.target.value)} placeholder="e.g. EQBLKENA" />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">M-Pesa Paybill / Till Number</label>
+                <input className="form-input" value={mpesaPaybill} onChange={e => setMpesaPaybill(e.target.value)} placeholder="e.g. 247247" />
+              </div>
+
+              <div className="form-group full">
+                <label className="form-label">M-Pesa Account Name / Reference</label>
+                <input className="form-input" value={mpesaAccount} onChange={e => setMpesaAccount(e.target.value)} placeholder="e.g. NORY LOGISTICS" />
+              </div>
+
+              <div className="form-group full" style={{marginTop: 16}}>
+                <button className="btn btn-primary" onClick={savePaymentSettings} style={{display:'inline-flex', alignItems:'center', gap: 6}}>
+                  <Save size={16}/> Save Bank Account Details
+                </button>
               </div>
             </div>
           )}

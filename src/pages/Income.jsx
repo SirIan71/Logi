@@ -5,18 +5,19 @@ import { getInvoiceableMonths, generateInvoices } from '../utils/invoiceGenerato
 import InvoicePreview, { printInvoice } from '../components/common/InvoiceTemplate';
 import StatusBadge from '../components/common/StatusBadge';
 import Modal from '../components/common/Modal';
-import { Plus, Search, Download, Edit2, Trash2, FileText, Printer, Zap, Eye } from 'lucide-react';
+import { Plus, Search, Download, Edit2, Trash2, FileText, Printer, Zap, Eye, CheckCircle2 } from 'lucide-react';
 
 const statusTabs = ['all', 'paid', 'partially_paid', 'unpaid'];
 
 export default function Income() {
-  const { income, trips, clients, lookup, addItem, updateItem, deleteItem } = useApp();
+  const { income, trips, clients, expenses, expenseCategories, lookup, addItem, updateItem, deleteItem } = useApp();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState({});
   const [previewInvoice, setPreviewInvoice] = useState(null);
   const [generatedInvoices, setGeneratedInvoices] = useState([]);
+  const [selectedGeneratedIds, setSelectedGeneratedIds] = useState([]);
   const [autoGenNotice, setAutoGenNotice] = useState(null);
 
   // ── Auto-generate invoices on mount (once per session) ──
@@ -28,12 +29,12 @@ export default function Income() {
 
     const invoiceable = getInvoiceableMonths(trips, income, clients);
     if (invoiceable.length > 0) {
-      const newInvoices = generateInvoices(invoiceable, clients, income.length);
+      const newInvoices = generateInvoices(invoiceable, clients, income.length, expenses, expenseCategories);
       if (newInvoices.length > 0) {
         setAutoGenNotice(newInvoices);
       }
     }
-  }, [trips, income, clients]);
+  }, [trips, income, clients, expenses, expenseCategories]);
 
   // ── Accept auto-generated invoices ──
   const acceptAutoGen = async () => {
@@ -65,16 +66,34 @@ export default function Income() {
   );
 
   const handleGenerate = () => {
-    const newInvoices = generateInvoices(invoiceable, clients, income.length);
+    const newInvoices = generateInvoices(invoiceable, clients, income.length, expenses, expenseCategories);
     setGeneratedInvoices(newInvoices);
+    setSelectedGeneratedIds(newInvoices.map(i => i.id));
     setModal('generate');
   };
 
+  const toggleSelectGenerated = (id) => {
+    setSelectedGeneratedIds(prev =>
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAllGenerated = () => {
+    if (selectedGeneratedIds.length === generatedInvoices.length) {
+      setSelectedGeneratedIds([]);
+    } else {
+      setSelectedGeneratedIds(generatedInvoices.map(i => i.id));
+    }
+  };
+
   const confirmGenerate = async () => {
-    for (const inv of generatedInvoices) {
+    const toCreate = generatedInvoices.filter(inv => selectedGeneratedIds.includes(inv.id));
+    if (toCreate.length === 0) return;
+    for (const inv of toCreate) {
       await addItem('income', inv);
     }
     setGeneratedInvoices([]);
+    setSelectedGeneratedIds([]);
     setModal(null);
   };
 
@@ -120,10 +139,27 @@ export default function Income() {
     return [];
   };
 
+  const getRedeemableExpensesForInvoice = (inv) => {
+    if (!inv) return [];
+    if (inv.redeemable_details && inv.redeemable_details.length > 0) {
+      return inv.redeemable_details;
+    }
+    const tripsForInv = getTripDetailsForInvoice(inv);
+    const tripIds = new Set(tripsForInv.map(t => t.id || t.trip_id));
+    return (expenses || []).filter(e => e.is_redeemable && e.trip_id && tripIds.has(e.trip_id)).map(e => ({
+      id: e.id,
+      category_name: lookup('expenseCategories', e.category_id)?.name || e.notes || 'Reimbursable Item',
+      amount: e.amount,
+      expense_date: e.expense_date,
+      notes: e.notes,
+    }));
+  };
+
   const handlePrint = (inv) => {
     const client = lookup('clients', inv.client_id);
     const tripDetails = getTripDetailsForInvoice(inv);
-    printInvoice(inv, client, tripDetails);
+    const redeemableExpenses = getRedeemableExpensesForInvoice(inv);
+    printInvoice(inv, client, tripDetails, { redeemableExpenses });
   };
 
   const handlePreview = (inv) => {
@@ -319,52 +355,123 @@ export default function Income() {
           invoice={previewInvoice}
           client={lookup('clients', previewInvoice.client_id)}
           tripDetails={getTripDetailsForInvoice(previewInvoice)}
+          redeemableExpenses={getRedeemableExpensesForInvoice(previewInvoice)}
         />
       </Modal>}
 
       {/* ── Generate Invoices Confirmation Modal ── */}
       {modal === 'generate' && <Modal
-        title="Generate Invoices"
+        title="Generate Client Invoices"
         onClose={closeModal}
         footer={<>
           <button className="btn btn-secondary" onClick={closeModal}>Cancel</button>
-          <button className="btn btn-primary" onClick={confirmGenerate}>
-            <FileText size={16}/> Generate {generatedInvoices.length} Invoice{generatedInvoices.length > 1 ? 's' : ''}
+          <button
+            className="btn btn-primary"
+            onClick={confirmGenerate}
+            disabled={selectedGeneratedIds.length === 0}
+            style={{ opacity: selectedGeneratedIds.length === 0 ? 0.5 : 1, cursor: selectedGeneratedIds.length === 0 ? 'not-allowed' : 'pointer' }}
+          >
+            <FileText size={16}/> Generate Selected ({selectedGeneratedIds.length})
           </button>
         </>}
       >
         <div style={{ marginBottom: 16, padding: 14, borderRadius: 10, background: 'var(--color-info-bg)', color: 'var(--color-info)', fontSize: 12 }}>
-          <strong>ℹ️ Auto-Generation:</strong> The following invoices will be created for completed months where all trips are finished. Amounts are calculated based on each client's rate.
+          <strong>ℹ️ Select & Preview Invoices:</strong> Choose which client invoices to generate below. You can preview or print/download any invoice PDF before saving.
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {generatedInvoices.map((inv, idx) => {
-            const client = lookup('clients', inv.client_id);
-            return (
-              <div key={idx} style={{
-                padding: 16, borderRadius: 12,
-                border: '1px solid var(--border-color)',
-                background: 'var(--bg-card)',
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <div>
-                    <span style={{ fontWeight: 800, fontSize: 15, color: 'var(--text-primary)' }}>{inv.invoice_number}</span>
-                    <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 8 }}>
-                      {new Date(inv.invoice_month + '-01').toLocaleDateString('en-UK', { month: 'long', year: 'numeric' })}
-                    </span>
-                  </div>
-                  <span style={{ fontWeight: 800, fontSize: 16, color: '#003539' }}>{formatCurrency(inv.amount)}</span>
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                  <strong>{client?.company_name || '—'}</strong> — {inv.trip_details?.length || 0} trip(s)
-                  {client?.rate_type === 'per_ton' ? ` • ${formatNumber(inv.trip_details?.reduce((s,t) => s + (t.cargo_weight_tons||0), 0) || 0)} tons @ KES ${formatNumber(client?.rate_amount)}/ton` : ` @ KES ${formatNumber(client?.rate_amount || 0)}/trip`}
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-                  Due: {formatDate(inv.due_date)}
-                </div>
+
+        {generatedInvoices.length === 0 ? (
+          <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>
+            <CheckCircle2 size={42} style={{ marginBottom: 12, color: '#10B981' }} />
+            <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-primary)', marginBottom: 4 }}>No Pending Invoices</div>
+            <div style={{ fontSize: 13 }}>All completed client trips for past months have already been invoiced.</div>
+          </div>
+        ) : (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>
+                Found {generatedInvoices.length} eligible invoice(s) • {selectedGeneratedIds.length} selected
               </div>
-            );
-          })}
-        </div>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ padding: '4px 10px', fontSize: 12 }}
+                onClick={toggleSelectAllGenerated}
+              >
+                {selectedGeneratedIds.length === generatedInvoices.length ? 'Deselect All' : 'Select All'}
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 420, overflowY: 'auto', paddingRight: 4 }}>
+              {generatedInvoices.map((inv) => {
+                const client = lookup('clients', inv.client_id);
+                const isSelected = selectedGeneratedIds.includes(inv.id);
+                const monthLabel = inv.invoice_month && inv.invoice_month.includes('-')
+                  ? new Date(Number(inv.invoice_month.split('-')[0]), Number(inv.invoice_month.split('-')[1]) - 1, 1).toLocaleDateString('en-UK', { month: 'long', year: 'numeric' })
+                  : inv.invoice_month;
+
+                return (
+                  <div key={inv.id} style={{
+                    padding: 16, borderRadius: 12,
+                    border: isSelected ? '2px solid #003539' : '1px solid var(--border-color)',
+                    background: isSelected ? 'rgba(0, 53, 57, 0.03)' : 'var(--bg-card)',
+                    transition: 'all 0.15s ease',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelectGenerated(inv.id)}
+                          style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#003539' }}
+                        />
+                        <div>
+                          <span style={{ fontWeight: 800, fontSize: 15, color: 'var(--text-primary)' }}>{inv.invoice_number}</span>
+                          <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 8 }}>
+                            {monthLabel}
+                          </span>
+                        </div>
+                      </div>
+                      <span style={{ fontWeight: 800, fontSize: 16, color: '#003539' }}>{formatCurrency(inv.amount)}</span>
+                    </div>
+
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginLeft: 28, marginBottom: 8 }}>
+                      <strong>{client?.company_name || '—'}</strong> — {inv.trip_details?.length || 0} trip(s)
+                      {client?.rate_type === 'per_ton'
+                        ? ` • ${formatNumber(inv.trip_details?.reduce((s,t) => s + (t.cargo_weight_tons||0), 0) || 0)} tons @ KES ${formatNumber(client?.rate_amount)}/ton`
+                        : ` @ KES ${formatNumber(client?.rate_amount || 0)}/trip`}
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginLeft: 28, paddingTop: 6, borderTop: '1px dashed var(--border-color)' }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        Due: {formatDate(inv.due_date)}
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          type="button"
+                          className="btn-icon"
+                          title="Preview Invoice"
+                          onClick={() => handlePreview(inv)}
+                          style={{ padding: '4px 8px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}
+                        >
+                          <Eye size={14}/> Preview
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-icon"
+                          title="Print / PDF Invoice"
+                          onClick={() => handlePrint(inv)}
+                          style={{ padding: '4px 8px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}
+                        >
+                          <Printer size={14}/> Print / PDF
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </Modal>}
     </div>
   );
