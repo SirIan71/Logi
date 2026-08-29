@@ -12,9 +12,8 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineEleme
 const chartOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1E293B', titleColor: '#F1F5F9', bodyColor: '#94A3B8', borderColor: '#334155', borderWidth: 1, padding: 10, cornerRadius: 8 }}, scales: { x: { grid: { color: '#1e293b44' }, ticks: { color: '#64748B', font: { size: 11 }}}, y: { grid: { color: '#1e293b44' }, ticks: { color: '#64748B', font: { size: 11 }}}}};
 
 export default function Fuel() {
-  const { fuelRecords, vehicles, trips, lookup, addItem, updateItem, deleteItem } = useApp();
-  const { canEdit, isOwnOnly, isReadOnly, user } = usePermission('fuel');
-  const drivers = useApp().users.filter(u => u.role === 'driver');
+  const { fuelRecords, expenses, expenseCategories, vehicles, trips, lookup, addItem, updateItem, deleteItem, user } = useApp();
+  const { canEdit, isOwnOnly } = usePermission('fuel');
   const { prices: fuelPrices, loading: pricesLoading, refresh: refreshPrices, updateRates } = useFuelPrices();
   const [search, setSearch] = useState('');
   const [vehicleFilter, setVehicleFilter] = useState('all');
@@ -22,11 +21,45 @@ export default function Fuel() {
   const [form, setForm] = useState({});
   const [rateForm, setRateForm] = useState({});
 
+  // Combine fuelRecords state with any expenses in the Fuel category not explicitly in fuelRecords
+  const combinedFuelRecords = useMemo(() => {
+    const fuelCat = (expenseCategories || []).find(c => c.name?.toLowerCase() === 'fuel' || c.id === 'ec1');
+    const fuelCatId = fuelCat?.id || 'ec1';
+
+    const existingExpenseIds = new Set((fuelRecords || []).map(f => f.expense_id).filter(Boolean));
+
+    const unlinkedExpenses = (expenses || []).filter(e => {
+      const cat = lookup('expenseCategories', e.category_id);
+      const isFuel = e.category_id === fuelCatId || (cat?.name && cat.name.toLowerCase() === 'fuel');
+      if (!isFuel) return false;
+      if (existingExpenseIds.has(e.id)) return false;
+      // Skip if identical fuel record already exists by vehicle, date & cost
+      const match = (fuelRecords || []).some(f => f.vehicle_id === e.vehicle_id && f.date === e.expense_date && Math.abs(f.cost - e.amount) < 1);
+      return !match;
+    });
+
+    const mappedFromExpenses = unlinkedExpenses.map(e => ({
+      id: `exp_fuel_${e.id}`,
+      expense_id: e.id,
+      vehicle_id: e.vehicle_id,
+      trip_id: e.trip_id,
+      recorded_by: e.driver_id || null,
+      cost: Number(e.amount) || 0,
+      liters: Number(e.liters) || (fuelPrices?.diesel && e.amount ? Number((e.amount / fuelPrices.diesel).toFixed(1)) : 0),
+      odometer_reading: Number(e.odometer_reading) || 0,
+      station: e.station || e.notes || 'Fuel Station',
+      date: e.expense_date,
+      is_from_expense: true,
+    }));
+
+    return [...(fuelRecords || []), ...mappedFromExpenses];
+  }, [fuelRecords, expenses, expenseCategories, fuelPrices, lookup]);
+
   // Drivers only see their own fuel records
   const visibleRecords = useMemo(() => {
-    if (isOwnOnly) return fuelRecords.filter(f => f.recorded_by === user?.id);
-    return fuelRecords;
-  }, [fuelRecords, isOwnOnly, user]);
+    if (isOwnOnly) return combinedFuelRecords.filter(f => f.recorded_by === user?.id);
+    return combinedFuelRecords;
+  }, [combinedFuelRecords, isOwnOnly, user]);
 
   const filtered = useMemo(() => {
     let data = vehicleFilter === 'all' ? visibleRecords : visibleRecords.filter(f => f.vehicle_id === vehicleFilter);
@@ -35,8 +68,8 @@ export default function Fuel() {
   }, [visibleRecords, search, vehicleFilter]);
 
   const totals = useMemo(() => {
-    const totalLiters = visibleRecords.reduce((s, f) => s + f.liters, 0);
-    const totalCost = visibleRecords.reduce((s, f) => s + f.cost, 0);
+    const totalLiters = visibleRecords.reduce((s, f) => s + (Number(f.liters) || 0), 0);
+    const totalCost = visibleRecords.reduce((s, f) => s + (Number(f.cost) || 0), 0);
     const avgPricePerLiter = totalCost / (totalLiters || 1);
     return { totalLiters, totalCost, avgPricePerLiter, records: visibleRecords.length };
   }, [visibleRecords]);
@@ -44,19 +77,20 @@ export default function Fuel() {
   // Efficiency per vehicle
   const efficiency = useMemo(() => {
     const vehicleData = {};
-    fuelRecords.forEach(f => {
+    combinedFuelRecords.forEach(f => {
+      if (!f.vehicle_id) return;
       if (!vehicleData[f.vehicle_id]) vehicleData[f.vehicle_id] = { liters: 0, cost: 0, records: [] };
-      vehicleData[f.vehicle_id].liters += f.liters;
-      vehicleData[f.vehicle_id].cost += f.cost;
+      vehicleData[f.vehicle_id].liters += (Number(f.liters) || 0);
+      vehicleData[f.vehicle_id].cost += (Number(f.cost) || 0);
       vehicleData[f.vehicle_id].records.push(f);
     });
     return Object.entries(vehicleData).map(([vid, d]) => {
       const v = lookup('vehicles', vid);
-      const recs = d.records.sort((a, b) => a.odometer_reading - b.odometer_reading);
+      const recs = d.records.filter(r => r.odometer_reading > 0).sort((a, b) => a.odometer_reading - b.odometer_reading);
       const distance = recs.length > 1 ? recs[recs.length - 1].odometer_reading - recs[0].odometer_reading : 0;
       return { vehicle: v?.registration || vid, liters: d.liters, cost: d.cost, distance, kmPerLiter: distance / (d.liters || 1), costPerKm: d.cost / (distance || 1) };
     }).sort((a, b) => a.kmPerLiter - b.kmPerLiter);
-  }, [fuelRecords, lookup]);
+  }, [combinedFuelRecords, lookup]);
 
   // Anomaly detection: flag if km/L is less than 60% of fleet average
   const fleetAvgKmL = efficiency.length > 0 ? efficiency.reduce((s, e) => s + e.kmPerLiter, 0) / efficiency.length : 0;
@@ -65,13 +99,13 @@ export default function Fuel() {
   // Fuel cost trend by date
   const fuelTrend = useMemo(() => {
     const byDate = {};
-    fuelRecords.forEach(f => { byDate[f.date] = (byDate[f.date] || 0) + f.cost; });
+    combinedFuelRecords.forEach(f => { if (f.date) byDate[f.date] = (byDate[f.date] || 0) + (Number(f.cost) || 0); });
     const sorted = Object.entries(byDate).sort((a, b) => a[0].localeCompare(b[0]));
     return {
       labels: sorted.map(s => formatDate(s[0])),
       datasets: [{ label: 'Fuel Cost', data: sorted.map(s => s[1]), borderColor: '#F59E0B', backgroundColor: '#f59e0b22', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#F59E0B' }]
     };
-  }, [fuelRecords]);
+  }, [combinedFuelRecords]);
 
   const efficiencyChart = useMemo(() => ({
     labels: efficiency.map(e => e.vehicle),
@@ -95,8 +129,49 @@ export default function Fuel() {
 
   const save = () => { 
     const data = { ...form, liters: +form.liters, cost: +form.cost, odometer_reading: +form.odometer_reading }; 
-    if (modal === 'add') addItem('fuelRecords', { ...data, id: generateId('f') }); 
-    else updateItem('fuelRecords', data); 
+    const fId = modal === 'add' ? generateId('f') : form.id;
+    const finalFuelData = { ...data, id: fId };
+
+    if (modal === 'add') addItem('fuelRecords', finalFuelData); 
+    else updateItem('fuelRecords', finalFuelData); 
+
+    // Sync to expenses table as well if not created from expense
+    const fuelCat = (expenseCategories || []).find(c => c.name?.toLowerCase() === 'fuel' || c.id === 'ec1');
+    const fuelCatId = fuelCat?.id || 'ec1';
+
+    if (finalFuelData.expense_id) {
+      updateItem('expenses', {
+        id: finalFuelData.expense_id,
+        amount: finalFuelData.cost,
+        expense_date: finalFuelData.date,
+        vehicle_id: finalFuelData.vehicle_id,
+        trip_id: finalFuelData.trip_id,
+        driver_id: finalFuelData.recorded_by,
+        liters: finalFuelData.liters,
+        odometer_reading: finalFuelData.odometer_reading,
+        station: finalFuelData.station,
+      });
+    } else {
+      const expId = generateId('e');
+      addItem('expenses', {
+        id: expId,
+        category_id: fuelCatId,
+        amount: finalFuelData.cost,
+        expense_date: finalFuelData.date,
+        vehicle_id: finalFuelData.vehicle_id,
+        trip_id: finalFuelData.trip_id,
+        driver_id: finalFuelData.recorded_by,
+        approval_status: 'approved',
+        is_redeemable: false,
+        is_redeemed: false,
+        notes: finalFuelData.station || 'Fuel Purchase',
+        liters: finalFuelData.liters,
+        odometer_reading: finalFuelData.odometer_reading,
+        station: finalFuelData.station,
+      });
+      // Link expense_id back
+      updateItem('fuelRecords', { ...finalFuelData, expense_id: expId });
+    }
     
     // Update vehicle odometer
     if (data.vehicle_id && data.odometer_reading) {
@@ -107,6 +182,18 @@ export default function Fuel() {
     }
     
     closeModal(); 
+  };
+
+  const handleDelete = (f) => {
+    if (f.id.startsWith('exp_fuel_')) {
+      const realExpId = f.id.replace('exp_fuel_', '');
+      deleteItem('expenses', realExpId);
+    } else {
+      deleteItem('fuelRecords', f.id);
+      if (f.expense_id) {
+        deleteItem('expenses', f.expense_id);
+      }
+    }
   };
 
   const saveRates = () => {
@@ -121,7 +208,6 @@ export default function Fuel() {
     closeModal();
   };
 
-  // Formatted last update time
   const lastUpdated = fuelPrices?.fetched_at
     ? new Date(fuelPrices.fetched_at).toLocaleString('en-UK', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     : '—';
@@ -139,7 +225,7 @@ export default function Fuel() {
         </div>
       </div>
 
-      {/* ── Live Kenya Fuel Rates Banner ── */}
+      {/* Live Kenya Fuel Rates Banner */}
       <div style={{
         background: 'linear-gradient(135deg, var(--surface-container-low) 0%, var(--surface-container) 100%)',
         border: '1px solid var(--outline-variant)',
@@ -267,30 +353,38 @@ export default function Fuel() {
           <table className="data-table">
             <thead><tr><th>Date</th><th>Vehicle</th><th>Liters</th><th>Cost</th><th>Price/L</th><th>Odometer</th><th>Station</th><th>Trip</th><th>Actions</th></tr></thead>
             <tbody>{filtered.length === 0 ? <tr><td colSpan={9} className="table-empty">No records</td></tr> :
-              filtered.map(f => { const trip = lookup('trips', f.trip_id); const pricePerL = f.liters > 0 ? f.cost / f.liters : 0; return (
-                <tr key={f.id}>
-                  <td>{formatDate(f.date)}</td>
-                  <td className="primary">{lookup('vehicles', f.vehicle_id)?.registration||'—'}</td>
-                  <td className="numeric">{formatNumber(f.liters)} L</td>
-                  <td className="numeric">{formatCurrency(f.cost)}</td>
-                  <td className="numeric" style={{
-                    color: fuelPrices?.diesel && pricePerL > fuelPrices.diesel * 1.05
-                      ? 'var(--color-danger)'
-                      : 'var(--text-secondary)',
-                    fontWeight: fuelPrices?.diesel && pricePerL > fuelPrices.diesel * 1.05 ? 600 : 400,
-                  }}>
-                    KES {formatNumber(pricePerL, 2)}
-                  </td>
-                  <td className="numeric">{formatNumber(f.odometer_reading)} km</td>
-                  <td>{f.station}</td>
-                  <td>{trip?`${trip.origin}→${trip.destination}`:'—'}</td>
-                  <td><div style={{display:'flex',gap:4}}>
-                    {canEdit && <button className="btn-icon" onClick={()=>openEdit(f)}><Edit2 size={16}/></button>}
-                    {canEdit && <button className="btn-icon" onClick={()=>deleteItem('fuelRecords',f.id)}><Trash2 size={16}/></button>}
-                    {!canEdit && !isOwnOnly && <span style={{fontSize:11,color:'var(--text-muted)'}}>View only</span>}
-                  </div></td>
-                </tr>
-              ); })
+              filtered.map(f => {
+                const trip = lookup('trips', f.trip_id);
+                const pricePerL = f.liters > 0 ? f.cost / f.liters : 0;
+                const stationName = (f.station && !f.station.includes('Expense Record Fuel') && !f.station.includes('Expense Table Record'))
+                  ? f.station
+                  : 'Fuel Station';
+
+                return (
+                  <tr key={f.id}>
+                    <td>{formatDate(f.date)}</td>
+                    <td className="primary">{lookup('vehicles', f.vehicle_id)?.registration||'—'}</td>
+                    <td className="numeric">{f.liters ? `${formatNumber(f.liters)} L` : '—'}</td>
+                    <td className="numeric">{formatCurrency(f.cost)}</td>
+                    <td className="numeric" style={{
+                      color: fuelPrices?.diesel && pricePerL > fuelPrices.diesel * 1.05
+                        ? 'var(--color-danger)'
+                        : 'var(--text-secondary)',
+                      fontWeight: fuelPrices?.diesel && pricePerL > fuelPrices.diesel * 1.05 ? 600 : 400,
+                    }}>
+                      {pricePerL > 0 ? `KES ${formatNumber(pricePerL, 2)}` : '—'}
+                    </td>
+                    <td className="numeric">{f.odometer_reading ? `${formatNumber(f.odometer_reading)} km` : '—'}</td>
+                    <td>{stationName}</td>
+                    <td>{trip ? `${trip.origin}→${trip.destination}` : '—'}</td>
+                    <td><div style={{display:'flex',gap:4}}>
+                      {canEdit && <button className="btn-icon" onClick={()=>openEdit(f)}><Edit2 size={16}/></button>}
+                      {canEdit && <button className="btn-icon" onClick={()=>handleDelete(f)}><Trash2 size={16}/></button>}
+                      {!canEdit && !isOwnOnly && <span style={{fontSize:11,color:'var(--text-muted)'}}>View only</span>}
+                    </div></td>
+                  </tr>
+                );
+              })
             }
             </tbody>
           </table>

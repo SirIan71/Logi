@@ -3,11 +3,13 @@ import { useApp } from '../context/AppContext';
 import { formatCurrency, formatDate, searchFilter, generateId, exportToCSV } from '../utils/helpers';
 import StatusBadge from '../components/common/StatusBadge';
 import Modal from '../components/common/Modal';
-import { Plus, Search, Download, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Search, Download, Edit2, Trash2, Fuel as FuelIcon } from 'lucide-react';
+import { useFuelPrices } from '../utils/useFuelPrices';
 
 export default function Expenses() {
-  const { expenses, expenseCategories, trips, vehicles, lookup, addItem, updateItem, deleteItem } = useApp();
+  const { expenses, expenseCategories, fuelRecords, trips, vehicles, lookup, addItem, updateItem, deleteItem, user } = useApp();
   const drivers = useApp().users.filter(u => u.role === 'driver');
+  const { prices: fuelPrices } = useFuelPrices();
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('all');
   const [redeemFilter, setRedeemFilter] = useState('all');
@@ -31,14 +33,75 @@ export default function Expenses() {
   }), [expenses]);
 
   const openAdd = () => { setForm({ approval_status: 'pending', is_redeemable: false, is_redeemed: false, expense_date: new Date().toISOString().split('T')[0] }); setModal('add'); };
-  const openEdit = (e) => { setForm({ ...e }); setModal('edit'); };
+  const openEdit = (e) => { 
+    const linkedFuel = fuelRecords.find(f => f.expense_id === e.id);
+    setForm({ 
+      ...e,
+      liters: linkedFuel?.liters || e.liters || '',
+      odometer_reading: linkedFuel?.odometer_reading || e.odometer_reading || '',
+      station: linkedFuel?.station || e.station || '',
+    }); 
+    setModal('edit'); 
+  };
   const closeModal = () => { setModal(null); setForm({}); };
 
+  const selectedCategoryObj = lookup('expenseCategories', form.category_id);
+  const isFuelCategory = form.category_id === 'ec1' || (selectedCategoryObj?.name && selectedCategoryObj.name.toLowerCase() === 'fuel');
+
   const save = () => {
-    const data = { ...form, amount: +form.amount };
-    if (modal === 'add') addItem('expenses', { ...data, id: generateId('e') });
+    const amountVal = +form.amount || 0;
+    const expId = modal === 'add' ? generateId('e') : form.id;
+
+    const data = {
+      ...form,
+      id: expId,
+      amount: amountVal,
+      liters: form.liters ? +form.liters : undefined,
+      odometer_reading: form.odometer_reading ? +form.odometer_reading : undefined,
+      station: form.station || undefined,
+    };
+
+    if (modal === 'add') addItem('expenses', data);
     else updateItem('expenses', data);
+
+    // If category is Fuel, sync / reflect to fuelRecords
+    if (isFuelCategory) {
+      const existingFuel = fuelRecords.find(f => f.expense_id === expId || (f.vehicle_id === data.vehicle_id && f.date === data.expense_date && Math.abs(f.cost - amountVal) < 1));
+      
+      let litersVal = Number(data.liters);
+      if (!litersVal && fuelPrices?.diesel && amountVal > 0) {
+        litersVal = Number((amountVal / fuelPrices.diesel).toFixed(1));
+      }
+
+      const fuelData = {
+        id: existingFuel ? existingFuel.id : generateId('f'),
+        expense_id: expId,
+        vehicle_id: data.vehicle_id || null,
+        trip_id: data.trip_id || null,
+        recorded_by: data.driver_id || user?.id || null,
+        cost: amountVal,
+        liters: litersVal || 0,
+        odometer_reading: Number(data.odometer_reading) || 0,
+        station: data.station || data.notes || 'Fuel Station',
+        date: data.expense_date,
+      };
+
+      if (existingFuel) {
+        updateItem('fuelRecords', fuelData);
+      } else {
+        addItem('fuelRecords', fuelData);
+      }
+    }
+
     closeModal();
+  };
+
+  const handleDelete = (e) => {
+    deleteItem('expenses', e.id);
+    const linkedFuel = fuelRecords.find(f => f.expense_id === e.id);
+    if (linkedFuel) {
+      deleteItem('fuelRecords', linkedFuel.id);
+    }
   };
 
   const handleExport = () => exportToCSV(filtered, 'expenses', [
@@ -98,13 +161,13 @@ export default function Expenses() {
                     <td className="primary">{cat?.name||'—'}</td>
                     <td className="numeric">{formatCurrency(e.amount)}</td>
                     <td>{lookup('vehicles', e.vehicle_id)?.registration||'—'}</td>
-                    <td>{trip?`${trip.origin}→${trip.destination}`:'—'}</td>
-                    <td>{e.is_redeemable ? <span style={{color:'var(--color-purple)',fontWeight:600}}>Yes{e.is_redeemed?' ✓':''}</span> : '—'}</td>
+                    <td>{trip ? `${trip.origin}→${trip.destination}` : '—'}</td>
+                    <td>{e.is_redeemable ? <span className="badge badge-purple">{e.is_redeemed ? 'Redeemed' : 'Redeemable'}</span> : <span className="badge badge-gray">No</span>}</td>
                     <td><StatusBadge status={e.approval_status}/></td>
-                    <td style={{maxWidth:200,overflow:'hidden',textOverflow:'ellipsis'}}>{e.notes}</td>
+                    <td style={{maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.notes||'—'}</td>
                     <td><div style={{display:'flex',gap:4}}>
                       <button className="btn-icon" onClick={()=>openEdit(e)}><Edit2 size={16}/></button>
-                      <button className="btn-icon" onClick={()=>deleteItem('expenses',e.id)}><Trash2 size={16}/></button>
+                      <button className="btn-icon" onClick={()=>handleDelete(e)}><Trash2 size={16}/></button>
                     </div></td>
                   </tr>
                 );
@@ -112,10 +175,10 @@ export default function Expenses() {
             </tbody>
           </table>
         </div>
-        <div className="table-footer"><span>{filtered.length} of {expenses.length} expenses</span></div>
+        <div className="table-footer"><span>{filtered.length} records</span></div>
       </div>
 
-      {modal && <Modal title={modal==='add'?'Add Expense':'Edit Expense'} onClose={closeModal}
+      {(modal === 'add' || modal === 'edit') && <Modal title={modal==='add'?'Add Expense':'Edit Expense'} onClose={closeModal}
         footer={<><button className="btn btn-secondary" onClick={closeModal}>Cancel</button><button className="btn btn-primary" onClick={save}>Save</button></>}>
         <div className="form-grid">
           <div className="form-group"><label className="form-label">Category</label>
@@ -123,7 +186,7 @@ export default function Expenses() {
               {expenseCategories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
-          <div className="form-group"><label className="form-label">Amount</label><input className="form-input" type="number" value={form.amount||''} onChange={e=>setForm({...form,amount:e.target.value})}/></div>
+          <div className="form-group"><label className="form-label">Amount (KES)</label><input className="form-input" type="number" value={form.amount||''} onChange={e=>setForm({...form,amount:e.target.value})}/></div>
           <div className="form-group"><label className="form-label">Vehicle</label>
             <select className="form-select" value={form.vehicle_id||''} onChange={e=>setForm({...form,vehicle_id:e.target.value})}><option value="">Select</option>
               {vehicles.map(v=><option key={v.id} value={v.id}>{v.registration}</option>)}
@@ -140,6 +203,30 @@ export default function Expenses() {
             </select>
           </div>
           <div className="form-group"><label className="form-label">Date</label><input className="form-input" type="date" value={form.expense_date||''} onChange={e=>setForm({...form,expense_date:e.target.value})}/></div>
+
+          {/* Conditional Fuel inputs if Fuel category is selected */}
+          {isFuelCategory && (
+            <div className="form-group full" style={{ padding: 12, borderRadius: 8, background: 'var(--color-warning-bg)', border: '1px solid var(--color-warning)', marginTop: 4 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--color-warning)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <FuelIcon size={14}/> Fuel Tracking Details
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                <div>
+                  <label className="form-label" style={{ fontSize: 10 }}>Liters Purchased</label>
+                  <input className="form-input" type="number" placeholder={fuelPrices?.diesel && form.amount ? `~${(form.amount / fuelPrices.diesel).toFixed(1)} L` : 'e.g. 190'} value={form.liters||''} onChange={e=>setForm({...form,liters:e.target.value})}/>
+                </div>
+                <div>
+                  <label className="form-label" style={{ fontSize: 10 }}>Odometer Reading (km)</label>
+                  <input className="form-input" type="number" placeholder="e.g. 245000" value={form.odometer_reading||''} onChange={e=>setForm({...form,odometer_reading:e.target.value})}/>
+                </div>
+                <div>
+                  <label className="form-label" style={{ fontSize: 10 }}>Fuel Station Name</label>
+                  <input className="form-input" placeholder="e.g. Shell / Engen" value={form.station||''} onChange={e=>setForm({...form,station:e.target.value})}/>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="form-group"><label className="form-label">Approval</label>
             <select className="form-select" value={form.approval_status||'pending'} onChange={e=>setForm({...form,approval_status:e.target.value})}>
               <option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option>
