@@ -63,7 +63,16 @@ export function generateInvoices(invoiceableMonths, clients, existingIncomeCount
   const year = new Date().getFullYear();
   let counter = existingIncomeCount;
 
-  return invoiceableMonths.map(cm => {
+  // Deduplicate invoiceable months by client_id + month
+  const seenKeys = new Set();
+  const uniqueMonths = (invoiceableMonths || []).filter(cm => {
+    const key = `${cm.client_id}::${cm.month}`;
+    if (seenKeys.has(key)) return false;
+    seenKeys.add(key);
+    return true;
+  });
+
+  return uniqueMonths.map(cm => {
     counter++;
     const client = clients.find(c => c.id === cm.client_id);
     if (!client) return null;

@@ -10,7 +10,7 @@ import { Plus, Search, Download, Edit2, Trash2, FileText, Printer, Zap, Eye, Che
 const statusTabs = ['all', 'paid', 'partially_paid', 'unpaid'];
 
 export default function Income() {
-  const { income, trips, clients, expenses, expenseCategories, lookup, addItem, updateItem, deleteItem } = useApp();
+  const { income, trips, clients, expenses, expenseCategories, lookup, addItem, updateItem, deleteItem, showToast } = useApp();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [modal, setModal] = useState(null);
@@ -41,7 +41,10 @@ export default function Income() {
     if (!autoGenNotice) return;
     try {
       for (const inv of autoGenNotice) {
-        await addItem('income', inv);
+        const exists = income.some(i => i.client_id === inv.client_id && i.invoice_month === inv.invoice_month);
+        if (!exists) {
+          await addItem('income', inv);
+        }
       }
       setAutoGenNotice(null);
     } catch (err) {
@@ -95,7 +98,10 @@ export default function Income() {
     if (toCreate.length === 0) return;
     try {
       for (const inv of toCreate) {
-        await addItem('income', inv);
+        const exists = income.some(i => i.client_id === inv.client_id && i.invoice_month === inv.invoice_month);
+        if (!exists) {
+          await addItem('income', inv);
+        }
       }
       setGeneratedInvoices([]);
       setSelectedGeneratedIds([]);
@@ -117,6 +123,15 @@ export default function Income() {
 
   const save = () => {
     const data = { ...form, amount: +form.amount, amount_paid: +form.amount_paid };
+
+    if (data.client_id && data.invoice_month) {
+      const existing = income.find(i => i.client_id === data.client_id && i.invoice_month === data.invoice_month && i.id !== data.id);
+      if (existing) {
+        showToast(`An invoice for this client for ${data.invoice_month} already exists (${existing.invoice_number}). Double invoicing is not allowed.`, 'warning');
+        return;
+      }
+    }
+
     if (+data.amount_paid >= +data.amount) data.payment_status = 'paid';
     else if (+data.amount_paid > 0) data.payment_status = 'partially_paid';
     else data.payment_status = 'unpaid';
