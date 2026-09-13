@@ -1,6 +1,7 @@
 -- Migration: Ensure complete schema for income & invoice persistence
--- Adds columns needed for auto-generated invoices and detailed line items
+-- Adds missing columns needed for income transactions and auto-generated invoices
 
+ALTER TABLE income ADD COLUMN IF NOT EXISTS created_at TIMESTAMP;
 ALTER TABLE income ADD COLUMN IF NOT EXISTS invoice_month TEXT;
 ALTER TABLE income ADD COLUMN IF NOT EXISTS generated_at TIMESTAMP;
 ALTER TABLE income ADD COLUMN IF NOT EXISTS trip_details JSONB;

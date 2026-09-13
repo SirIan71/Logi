@@ -108,23 +108,9 @@ export async function getById(collection, id) {
   return data;
 }
 
-const CORE_INCOME_COLUMNS = new Set([
-  'id', 'trip_id', 'client_id', 'invoice_number', 'invoice_month', 'amount', 'amount_paid',
-  'payment_status', 'payment_date', 'due_date', 'notes', 'generated_at', 'trip_details',
-  'freight_amount', 'redeemable_amount', 'redeemable_details', 'created_at'
-]);
-
-function getCoreClean(table, clean) {
-  if (table !== 'income') return clean;
-  const fallback = {};
-  for (const k in clean) {
-    if (CORE_INCOME_COLUMNS.has(k)) fallback[k] = clean[k];
-  }
-  return fallback;
-}
-
 /**
  * Insert a new record (or replace if same PK exists).
+ * Dynamically retries without missing schema columns if PostgREST reports schema mismatches.
  * @param {string} collection
  * @param {Object} data — must include an `id` field
  * @returns {Promise<string>} the id of the inserted record
@@ -132,22 +118,32 @@ function getCoreClean(table, clean) {
 export async function insert(collection, data) {
   const table = tableName(collection);
   const clean = sanitize(table, data);
-  const { error } = await db.from(table).upsert(clean);
-  if (error) {
-    console.error(`Error inserting into ${table}:`, error.message);
-    if (table === 'income' && (error.code === 'PGRST204' || error.code === '42703' || error.message?.includes('column') || error.message?.includes('schema'))) {
-      console.warn(`[SIRIAN DB] Retrying insert into ${table} with core columns...`);
-      const coreClean = getCoreClean(table, clean);
-      const { error: retryErr } = await db.from(table).upsert(coreClean);
-      if (!retryErr) return data.id;
+  let payload = { ...clean };
+
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const { error } = await db.from(table).upsert(payload);
+    if (!error) return data.id;
+
+    console.error(`Error inserting into ${table} (attempt ${attempt + 1}):`, error.message);
+
+    const match = error.message?.match(/Could not find the '([^']+)' column/i)
+               || error.message?.match(/column "?([a-zA-Z0-9_]+)"? does not exist/i);
+
+    if (match && match[1] && (match[1] in payload)) {
+      const missingCol = match[1];
+      console.warn(`[SIRIAN DB] Column '${missingCol}' missing in '${table}' schema cache. Stripping '${missingCol}' and retrying...`);
+      delete payload[missingCol];
+    } else {
+      throw error;
     }
-    throw error;
   }
-  return data.id;
+
+  throw new Error(`Failed to insert into ${table} due to persistent schema incompatibility.`);
 }
 
 /**
  * Update an existing record (partial merge).
+ * Dynamically retries without missing schema columns if PostgREST reports schema mismatches.
  * @param {string} collection
  * @param {string} id
  * @param {Object} changes — fields to merge
@@ -156,18 +152,27 @@ export async function insert(collection, data) {
 export async function update(collection, id, changes) {
   const table = tableName(collection);
   const clean = sanitize(table, changes);
-  const { error } = await db.from(table).update(clean).eq('id', id);
-  if (error) {
-    console.error(`Error updating ${id} in ${table}:`, error.message);
-    if (table === 'income' && (error.code === 'PGRST204' || error.code === '42703' || error.message?.includes('column') || error.message?.includes('schema'))) {
-      console.warn(`[SIRIAN DB] Retrying update in ${table} with core columns...`);
-      const coreClean = getCoreClean(table, clean);
-      const { error: retryErr } = await db.from(table).update(coreClean).eq('id', id);
-      if (!retryErr) return 1;
+  let payload = { ...clean };
+
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const { error } = await db.from(table).update(payload).eq('id', id);
+    if (!error) return 1;
+
+    console.error(`Error updating ${id} in ${table} (attempt ${attempt + 1}):`, error.message);
+
+    const match = error.message?.match(/Could not find the '([^']+)' column/i)
+               || error.message?.match(/column "?([a-zA-Z0-9_]+)"? does not exist/i);
+
+    if (match && match[1] && (match[1] in payload)) {
+      const missingCol = match[1];
+      console.warn(`[SIRIAN DB] Column '${missingCol}' missing in '${table}' schema cache. Stripping '${missingCol}' and retrying update...`);
+      delete payload[missingCol];
+    } else {
+      throw error;
     }
-    throw error;
   }
-  return 1;
+
+  throw new Error(`Failed to update ${id} in ${table} due to persistent schema incompatibility.`);
 }
 
 /**
