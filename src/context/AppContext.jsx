@@ -8,14 +8,14 @@ const AppContext = createContext();
 const COLLECTIONS = [
   'users', 'clients', 'vehicles', 'routes', 'trips',
   'income', 'expenses', 'expenseCategories',
-  'fuelRecords', 'maintenance', 'vehicleDocuments', 'auditLogs',
+  'fuelRecords', 'maintenance', 'vehicleDocuments', 'auditLogs', 'workshops',
 ];
 
 const initialState = {
   user: null,
   users: [], clients: [], vehicles: [], routes: [], trips: [],
   income: [], expenses: [], expenseCategories: [],
-  fuelRecords: [], maintenance: [], vehicleDocuments: [], auditLogs: [],
+  fuelRecords: [], maintenance: [], vehicleDocuments: [], auditLogs: [], workshops: [],
   sidebarOpen: true,
 };
 
@@ -33,11 +33,21 @@ function reducer(state, action) {
 }
 
 /**
- * Load all collections from Supabase into React state.
+ * Load all collections from Supabase into React state in parallel.
  */
 async function loadAllCollections(dispatch) {
-  for (const name of COLLECTIONS) {
-    const data = await getAll(name);
+  const results = await Promise.all(
+    COLLECTIONS.map(async (name) => {
+      try {
+        const data = await getAll(name);
+        return { name, data };
+      } catch (err) {
+        console.error(`[SIRIAN DB] Error loading collection ${name}:`, err);
+        return { name, data: [] };
+      }
+    })
+  );
+  for (const { name, data } of results) {
     dispatch({ type: 'SET_COLLECTION', collection: name, payload: data });
   }
 }
@@ -235,6 +245,7 @@ export function AppProvider({ children }) {
       fuelRecords: 'Fuel Record',
       maintenance: 'Maintenance Service',
       vehicleDocuments: 'Vehicle Document',
+      workshops: 'Workshop',
     };
     return labels[col] || col;
   };
@@ -335,6 +346,136 @@ export function AppProvider({ children }) {
 
   const lookup = useCallback((collection, id) => state[collection]?.find(i => i.id === id), [state]);
 
+  // ── Maintenance Approval Sequence Helpers ───────────────────────────────
+  const submitRepairRequest = useCallback(async (repairData) => {
+    const id = 'm_' + Math.random().toString(36).substr(2, 9);
+    const item = {
+      ...repairData,
+      id,
+      driver_id: repairData.driver_id || state.user?.id || null,
+      type: repairData.type || 'repair',
+      status: 'pending_ops',
+      expected_cost: Number(repairData.expected_cost) || 0,
+      evidence_photos: repairData.evidence_photos || [],
+      evidence_audio: repairData.evidence_audio || null,
+      created_at: new Date().toISOString()
+    };
+    await addItem('maintenance', item);
+    return id;
+  }, [addItem, state.user]);
+
+  const approveMaintenanceByOps = useCallback(async (id, opsData) => {
+    const existing = state.maintenance?.find(m => m.id === id);
+    if (!existing) return;
+    const changes = {
+      ...existing,
+      ...opsData,
+      status: 'pending_admin',
+      ops_approved_by: state.user?.id || null,
+      ops_approved_at: new Date().toISOString(),
+      expected_cost: Number(opsData.expected_cost ?? existing.expected_cost) || 0,
+    };
+    await updateItem('maintenance', changes);
+    showToast('Maintenance request reviewed & submitted to Admin for final approval', 'success');
+  }, [updateItem, state.maintenance, state.user, showToast]);
+
+  const approveMaintenanceByAdmin = useCallback(async (id, adminData = {}) => {
+    const existing = state.maintenance?.find(m => m.id === id);
+    if (!existing) return;
+    const changes = {
+      ...existing,
+      ...adminData,
+      status: 'approved_scheduled',
+      admin_approved_by: state.user?.id || null,
+      admin_approved_at: new Date().toISOString(),
+      is_non_working_day: adminData.is_non_working_day ?? existing.is_non_working_day ?? true,
+      scheduled_date: adminData.scheduled_date || existing.scheduled_date,
+    };
+    await updateItem('maintenance', changes);
+    showToast(`Maintenance approved & locked for ${changes.scheduled_date || 'scheduled date'}!`, 'success');
+  }, [updateItem, state.maintenance, state.user, showToast]);
+
+  const rejectMaintenance = useCallback(async (id, rejectionReason) => {
+    const existing = state.maintenance?.find(m => m.id === id);
+    if (!existing) return;
+    const changes = {
+      ...existing,
+      status: 'rejected',
+      rejection_reason: rejectionReason,
+    };
+    await updateItem('maintenance', changes);
+    showToast('Maintenance request was rejected', 'warning');
+  }, [updateItem, state.maintenance, showToast]);
+
+  const startMaintenance = useCallback(async (id) => {
+    const existing = state.maintenance?.find(m => m.id === id);
+    if (!existing) return;
+    await updateItem('maintenance', { ...existing, status: 'in_progress' });
+    if (existing.vehicle_id) {
+      const vehicle = state.vehicles?.find(v => v.id === existing.vehicle_id);
+      if (vehicle && vehicle.status !== 'maintenance') {
+        await updateItem('vehicles', { ...vehicle, status: 'maintenance' });
+      }
+    }
+    showToast('Vehicle marked as In Maintenance', 'info');
+  }, [updateItem, state.maintenance, state.vehicles, showToast]);
+
+  const completeMaintenance = useCallback(async (id, completionData) => {
+    const existing = state.maintenance?.find(m => m.id === id);
+    if (!existing) return;
+    const finalCost = Number(completionData.cost ?? existing.cost ?? existing.expected_cost) || 0;
+    const partsCost = Number(completionData.parts_cost) || 0;
+    const laborCost = Number(completionData.labor_cost) || (finalCost - partsCost);
+    const serviceDate = completionData.service_date || new Date().toISOString().split('T')[0];
+
+    const changes = {
+      ...existing,
+      ...completionData,
+      status: 'completed',
+      cost: finalCost,
+      parts_cost: partsCost,
+      labor_cost: laborCost,
+      service_date: serviceDate,
+    };
+    await updateItem('maintenance', changes);
+
+    // Update vehicle status back to active & update odometer if needed
+    if (existing.vehicle_id) {
+      const vehicle = state.vehicles?.find(v => v.id === existing.vehicle_id);
+      if (vehicle) {
+        const newOdo = completionData.odometer_at_service && Number(completionData.odometer_at_service) > vehicle.current_odometer
+          ? Number(completionData.odometer_at_service)
+          : vehicle.current_odometer;
+        await updateItem('vehicles', { ...vehicle, status: 'active', current_odometer: newOdo });
+      }
+    }
+
+    // Auto-sync expense into Expenses module (category ec2 = Repairs & Maintenance)
+    try {
+      const expenseId = 'exp_maint_' + Math.random().toString(36).substr(2, 7);
+      await addItem('expenses', {
+        id: expenseId,
+        trip_id: null,
+        vehicle_id: existing.vehicle_id,
+        driver_id: existing.driver_id || null,
+        category_id: 'ec2', // Repairs & Maintenance
+        amount: finalCost,
+        is_redeemable: false,
+        is_redeemed: false,
+        expense_date: serviceDate,
+        submitted_by: state.user?.id || null,
+        notes: `Maintenance: ${existing.service_type || 'Service'} (${existing.vendor || 'Workshop'})`,
+        approval_status: 'approved',
+        approved_by: state.user?.id || null,
+        created_at: new Date().toISOString()
+      });
+    } catch (expErr) {
+      console.warn('[SIRIAN] Auto-expense creation for maintenance notice:', expErr.message);
+    }
+
+    showToast('Maintenance service marked as completed & expenses recorded', 'success');
+  }, [updateItem, addItem, state.maintenance, state.vehicles, state.user, showToast]);
+
   // ── Loading / error states ─────────────────────────────────────────────
   if (dbError) {
     return (
@@ -373,7 +514,13 @@ export function AppProvider({ children }) {
   }
 
   return (
-    <AppContext.Provider value={{ ...state, login, logout, toggleSidebar, addItem, updateItem, deleteItem, lookup, showToast, dispatch }}>
+    <AppContext.Provider value={{
+      ...state,
+      login, logout, toggleSidebar,
+      addItem, updateItem, deleteItem, lookup, showToast, dispatch,
+      submitRepairRequest, approveMaintenanceByOps, approveMaintenanceByAdmin,
+      rejectMaintenance, startMaintenance, completeMaintenance,
+    }}>
       {children}
       <div className="toast-container">
         {toasts.map(t => (

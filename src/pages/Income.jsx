@@ -22,16 +22,17 @@ export default function Income() {
 
   // ── Auto-generate invoices on mount (once per session) ──
   useEffect(() => {
+    if (!trips.length && !income.length) return;
     const sessionKey = 'sirian_invoice_gen_checked';
     const alreadyChecked = sessionStorage.getItem(sessionKey);
     if (alreadyChecked) return;
-    sessionStorage.setItem(sessionKey, 'true');
 
     const invoiceable = getInvoiceableMonths(trips, income, clients);
     if (invoiceable.length > 0) {
       const newInvoices = generateInvoices(invoiceable, clients, income.length, expenses, expenseCategories);
       if (newInvoices.length > 0) {
-        setAutoGenNotice(newInvoices);
+        sessionStorage.setItem(sessionKey, 'true');
+        setTimeout(() => setAutoGenNotice(newInvoices), 0);
       }
     }
   }, [trips, income, clients, expenses, expenseCategories]);

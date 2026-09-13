@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { formatCurrency, formatDate, formatNumber, searchFilter, generateId, daysUntil, exportToCSV } from '../utils/helpers';
 import StatusBadge from '../components/common/StatusBadge';
 import Modal from '../components/common/Modal';
-import { Plus, Search, Download, Edit2, Trash2, Eye, Wrench, AlertTriangle, Shield } from 'lucide-react';
+import { Plus, Search, Download, Edit2, Trash2, Eye, Wrench, AlertTriangle, Shield, ExternalLink } from 'lucide-react';
 
 export default function Fleet() {
   const { vehicles, maintenance, vehicleDocuments, trips, fuelRecords, lookup, addItem, updateItem, deleteItem } = useApp();
@@ -70,7 +71,8 @@ export default function Fleet() {
     <div>
       <div className="page-header"><h1>Fleet Management</h1>
         <div className="page-header-actions">
-          <button className="btn btn-secondary" onClick={openAddMaint}><Wrench size={16}/> Log Service</button>
+          <Link to="/maintenance" className="btn btn-secondary flex items-center gap-1.5"><Wrench size={16}/> Maintenance Engine <ExternalLink size={14}/></Link>
+          <button className="btn btn-secondary" onClick={openAddMaint}><Plus size={16}/> Log Service</button>
           <button className="btn btn-primary" onClick={openAddVehicle}><Plus size={16}/> Add Vehicle</button>
         </div>
       </div>

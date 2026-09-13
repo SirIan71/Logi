@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { usePermission } from '../hooks/usePermission';
 import { formatCurrency, formatNumber, formatDate, getTripProfitability } from '../utils/helpers';
@@ -123,6 +124,13 @@ function DriverDashboard() {
               <div className="flex justify-between"><span className="text-sm text-on-surface-variant">Capacity</span><span className="text-sm font-bold text-primary">{myVehicle.capacity_tons}t</span></div>
               <div className="flex justify-between"><span className="text-sm text-on-surface-variant">Odometer</span><span className="text-sm font-bold text-primary">{formatNumber(myVehicle.current_odometer)} km</span></div>
               <div className="flex justify-between"><span className="text-sm text-on-surface-variant">Status</span><span className={`text-sm font-bold ${myVehicle.status === 'active' ? 'text-secondary' : 'text-error'}`}>{myVehicle.status}</span></div>
+              <Link
+                to="/maintenance"
+                className="mt-3 w-full py-2 px-3 rounded-xl bg-lime-400 text-teal-950 font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-lime-300 transition-all shadow-xs"
+              >
+                <span className="material-symbols-outlined text-base">build</span>
+                <span>Report Issue / Schedule Repair</span>
+              </Link>
             </div>
           ) : (
             <p className="text-sm text-outline">No vehicle currently assigned to you.</p>
@@ -197,13 +205,26 @@ function DriverDashboard() {
   );
 }
 
-// ── Main Dashboard ────────────────────────────────────────────────────────────
-export default function Dashboard() {
-  const { trips, income, expenses, vehicles, clients, lookup, user } = useApp();
-  const { isOwnOnly } = usePermission('dashboard');
+function ChangeBadge({ value, invertColor = false }) {
+  const isPositive = value > 0;
+  const isNegative = value < 0;
+  // For expenses, a positive change is bad (inverted)
+  const goodChange = invertColor ? isNegative : isPositive;
+  const badChange = invertColor ? isPositive : isNegative;
+  const colorClasses = goodChange
+    ? 'text-secondary bg-secondary-container'
+    : badChange
+    ? 'text-error bg-error-container'
+    : 'text-outline bg-surface-container-high';
+  return (
+    <span className={`text-xs font-bold px-2 py-1 rounded-full ${colorClasses}`}>
+      {isPositive ? '+' : ''}{value}%
+    </span>
+  );
+}
 
-  // Driver gets their own personal dashboard
-  if (isOwnOnly) return <DriverDashboard />;
+function ManagerDashboard() {
+  const { trips, income, expenses, vehicles, clients, maintenance, lookup, user } = useApp();
 
   const stats = useMemo(() => {
     const actualIncome = income.filter(i => i.payment_status === 'paid').reduce((s, i) => s + i.amount_paid, 0);
@@ -394,25 +415,6 @@ export default function Dashboard() {
     }));
   }, [income, expenses]);
 
-  const ChangeBadge = ({ value, invertColor = false }) => {
-    const isPositive = value > 0;
-    const isNegative = value < 0;
-    const isNeutral = value === 0;
-    // For expenses, a positive change is bad (inverted)
-    const goodChange = invertColor ? isNegative : isPositive;
-    const badChange = invertColor ? isPositive : isNegative;
-    const colorClasses = goodChange
-      ? 'text-secondary bg-secondary-container'
-      : badChange
-      ? 'text-error bg-error-container'
-      : 'text-outline bg-surface-container-high';
-    return (
-      <span className={`text-xs font-bold px-2 py-1 rounded-full ${colorClasses}`}>
-        {isPositive ? '+' : ''}{value}%
-      </span>
-    );
-  };
-
   return (
     <>
       <div className="flex justify-between items-end">
@@ -421,6 +423,35 @@ export default function Dashboard() {
           <p className="text-on-surface-variant font-body">Performance tracking for the current operational cycle.</p>
         </div>
       </div>
+
+      {/* Maintenance Engine Alert Banner */}
+      {maintenance && (() => {
+        const pendingCount = maintenance.filter(m => ['pending_ops', 'pending_admin'].includes(m.status)).length;
+        const scheduledCount = maintenance.filter(m => m.status === 'approved_scheduled').length;
+        if (pendingCount === 0 && scheduledCount === 0) return null;
+        return (
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-xl bg-teal-950 text-white gap-3 border border-teal-800 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-lime-400 text-teal-950 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-xl">build</span>
+              </div>
+              <div>
+                <p className="text-xs font-extrabold uppercase tracking-wider text-lime-400">Maintenance & Peak Performance Engine</p>
+                <p className="text-xs text-teal-100/90">
+                  {pendingCount > 0 && `${pendingCount} repair request${pendingCount > 1 ? 's' : ''} awaiting approval. `}
+                  {scheduledCount > 0 && `${scheduledCount} maintenance service${scheduledCount > 1 ? 's' : ''} locked for upcoming non-working rest days.`}
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/maintenance"
+              className="px-3 py-1.5 rounded-lg bg-lime-400 text-teal-950 hover:bg-lime-300 font-bold text-xs whitespace-nowrap transition-all shadow-xs"
+            >
+              Manage Maintenance →
+            </Link>
+          </div>
+        );
+      })()}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-surface-container-lowest p-6 rounded-xl shadow-sm border border-transparent hover:border-outline-variant/20 transition-all">
@@ -690,4 +721,11 @@ export default function Dashboard() {
       </div>
     </>
   );
+}
+
+// ── Main Dashboard ────────────────────────────────────────────────────────────
+export default function Dashboard() {
+  const { isOwnOnly } = usePermission('dashboard');
+  if (isOwnOnly) return <DriverDashboard />;
+  return <ManagerDashboard />;
 }

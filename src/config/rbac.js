@@ -14,60 +14,64 @@
 // ── Permissions Matrix ────────────────────────────────────────────────────────
 export const ROLE_PERMISSIONS = {
   admin: {
-    dashboard:  'full',
-    trips:      'full',
-    routes:     'full',
-    fleet:      'full',
-    drivers:    'full',
-    clients:    'full',
-    income:     'full',
-    fuel:       'full',
-    expenses:   'full',
-    reports:    'full',
-    'audit-log':'full',
-    settings:   'full',
+    dashboard:   'full',
+    trips:       'full',
+    routes:      'full',
+    fleet:       'full',
+    maintenance: 'full',
+    drivers:     'full',
+    clients:     'full',
+    income:      'full',
+    fuel:        'full',
+    expenses:    'full',
+    reports:     'full',
+    'audit-log': 'full',
+    settings:    'full',
   },
   finance: {
-    dashboard:  'full',
-    trips:      'read',
-    routes:     'none',
-    fleet:      'none',
-    drivers:    'none',
-    clients:    'read',
-    income:     'full',
-    fuel:       'full',
-    expenses:   'full',
-    reports:    'read',
-    'audit-log':'none',
-    settings:   'read', // limited — no user management
+    dashboard:   'full',
+    trips:       'read',
+    routes:      'none',
+    fleet:       'none',
+    maintenance: 'full',
+    drivers:     'none',
+    clients:     'read',
+    income:      'full',
+    fuel:        'full',
+    expenses:    'full',
+    reports:     'read',
+    'audit-log': 'none',
+    settings:    'read', // limited — no user management
   },
   operations: {
-    dashboard:  'full',
-    trips:      'full',
-    routes:     'full',
-    fleet:      'full',
-    drivers:    'full',
-    clients:    'full',
-    income:     'none',
-    fuel:       'read',
-    expenses:   'none',
-    reports:    'read',
-    'audit-log':'none',
-    settings:   'read', // limited — no user management
+    dashboard:   'full',
+    trips:       'full',
+    routes:      'full',
+    fleet:       'full',
+    maintenance: 'full',
+    drivers:     'full',
+    clients:     'full',
+    income:      'none',
+    fuel:        'read',
+    expenses:    'none',
+    reports:     'read',
+    'audit-log': 'none',
+    settings:    'read', // limited — no user management
   },
   driver: {
-    dashboard:  'own',  // personal dashboard
-    trips:      'own',  // own trips only
-    routes:     'own',  // own routes only
-    fleet:      'none',
-    drivers:    'none',
-    clients:    'none',
-    income:     'none',
-    fuel:       'own',  // log own fuel only
-    expenses:   'none',
-    reports:    'none',
-    'audit-log':'none',
-    settings:   'read', // appearance + notifications only
+    dashboard:   'own',  // personal dashboard
+    trips:       'own',  // own trips only
+    routes:      'own',  // own routes only
+    fleet:       'none',
+    maintenance: 'own',  // own vehicle repair scheduling
+    drivers:     'none',
+    clients:     'none',
+    income:      'none',
+    fuel:        'own',  // log own fuel only
+    expenses:    'none',
+    reports:     'none',
+    'audit-log': 'none',
+    settings:    'read', // appearance + notifications only
   },
 };
 
@@ -101,6 +105,7 @@ const ALL_NAV_ITEMS = [
   { path: '/routes', label: 'Routes', icon: 'map', group: 'Operations', page: 'routes' },
   { path: '/trips', label: 'Trips', icon: 'route', group: 'Operations', page: 'trips' },
   { path: '/fleet', label: 'Fleet', icon: 'local_shipping', group: 'Operations', page: 'fleet' },
+  { path: '/maintenance', label: 'Maintenance', icon: 'build', group: 'Operations', page: 'maintenance' },
   { path: '/drivers', label: 'Drivers', icon: 'badge', group: 'Operations', page: 'drivers' },
   // Finance
   { path: '/income', label: 'Income', icon: 'payments', group: 'Finance', page: 'income' },

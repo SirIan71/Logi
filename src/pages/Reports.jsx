@@ -31,7 +31,7 @@ export default function Reports() {
         { label: 'Expenses', data: entries.map(e => e[1].expenses), backgroundColor: '#EF4444', borderRadius: 6 },
       ]
     };
-  }, [trips, income, expenses, lookup]);
+  }, [trips, income, expenses, clients, lookup]);
 
   // Expense breakdown by category
   const expenseBreakdown = useMemo(() => {

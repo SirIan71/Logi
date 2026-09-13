@@ -22,6 +22,7 @@ const TABLE_MAP = {
   maintenance:      'maintenance',
   vehicleDocuments: 'vehicle_documents',
   auditLogs:        'audit_logs',
+  workshops:        'workshops',
 };
 
 // ─── Column whitelists per table (must match DB schema exactly) ────────────────
@@ -37,7 +38,18 @@ const COLUMN_WHITELIST = {
   expense_categories: ['id', 'name', 'default_redeemable', 'icon'],
   expenses:           ['id', 'trip_id', 'vehicle_id', 'driver_id', 'category_id', 'amount', 'is_redeemable', 'is_redeemed', 'expense_date', 'receipt_url', 'submitted_by', 'notes', 'approval_status', 'approved_by', 'created_at'],
   fuel_records:       ['id', 'vehicle_id', 'trip_id', 'recorded_by', 'liters', 'cost', 'odometer_reading', 'station', 'date', 'created_at'],
-  maintenance:        ['id', 'vehicle_id', 'type', 'service_type', 'description', 'cost', 'service_date', 'odometer_at_service', 'next_due_km', 'next_due_date', 'vendor', 'notes', 'created_at'],
+  maintenance:        [
+    'id', 'vehicle_id', 'type', 'service_type', 'description', 'cost', 'expected_cost', 'parts_cost', 'labor_cost',
+    'service_date', 'scheduled_date', 'is_non_working_day', 'non_working_day_type', 'odometer_at_service',
+    'next_due_km', 'next_due_date', 'vendor', 'workshop_id', 'mechanic_name', 'mechanic_phone', 'priority', 'status',
+    'driver_id', 'evidence_photos', 'evidence_audio', 'ops_approved_by', 'ops_approved_at', 'ops_notes',
+    'admin_approved_by', 'admin_approved_at', 'admin_notes', 'rejection_reason', 'compliance_category',
+    'items_serviced', 'notes', 'created_at'
+  ],
+  workshops:          [
+    'id', 'name', 'city', 'address', 'phone', 'email', 'contact_person', 'lead_mechanic_name',
+    'lead_mechanic_phone', 'specialties', 'rating', 'is_active', 'notes', 'created_at'
+  ],
   vehicle_documents:  ['id', 'vehicle_id', 'doc_type', 'issue_date', 'expiry_date', 'notes'],
   audit_logs:         ['id', 'user_id', 'entity_type', 'entity_id', 'action', 'old_values', 'new_values', 'created_at'],
 };
@@ -59,7 +71,7 @@ function tableName(collection) {
 const FK_COLUMNS = new Set([
   'route_id', 'vehicle_id', 'driver_id', 'client_id', 'trip_id',
   'category_id', 'user_id', 'recorded_by', 'assigned_driver_id', 'auth_id',
-  'submitted_by', 'approved_by',
+  'submitted_by', 'approved_by', 'workshop_id', 'ops_approved_by', 'admin_approved_by',
 ]);
 
 function sanitize(table, data) {
