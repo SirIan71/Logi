@@ -14,7 +14,7 @@ import { formatCurrency, formatDate, formatNumber } from '../../utils/helpers';
  */
 export function printInvoice(invoice, client, tripDetails, options = {}) {
   const {
-    companyName = 'Nory',
+    companyName = 'Nory Logistics Ltd',
     companyTagline = 'LOGISTICS LTD',
     companyAddress = 'P.O Box 166-20406, Sotik, Kenya',
     companyPhone = '+254 717357535',
