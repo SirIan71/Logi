@@ -23,8 +23,12 @@ export function getInvoiceableMonths(trips, income, clients) {
     if (i.trip_id) {
       invoicedTripIds.add(i.trip_id);
     }
-    if (Array.isArray(i.trip_details)) {
-      i.trip_details.forEach(td => {
+    let tripDetails = i.trip_details;
+    if (typeof tripDetails === 'string') {
+      try { tripDetails = JSON.parse(tripDetails); } catch (e) { tripDetails = null; }
+    }
+    if (Array.isArray(tripDetails)) {
+      tripDetails.forEach(td => {
         if (td.id) invoicedTripIds.add(td.id);
         if (td.trip_id) invoicedTripIds.add(td.trip_id);
       });

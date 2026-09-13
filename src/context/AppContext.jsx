@@ -280,7 +280,9 @@ export function AppProvider({ children }) {
       }
     } catch (err) {
       console.error(`[SIRIAN DB] Failed to sync ${collection} to Supabase:`, err);
-      showToast(`Added to ${getCollectionLabel(collection).toLowerCase()} table locally, sync issue logged.`, 'info');
+      dispatch({ type: 'DELETE_ITEM', collection, payload: { id: item.id } });
+      showToast(`Failed to save ${getCollectionLabel(collection).toLowerCase()} to database: ${err.message || 'Sync error'}`, 'error');
+      throw err;
     }
   }, [showToast, writeAuditLog]);
 

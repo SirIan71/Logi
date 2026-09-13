@@ -39,10 +39,14 @@ export default function Income() {
   // ── Accept auto-generated invoices ──
   const acceptAutoGen = async () => {
     if (!autoGenNotice) return;
-    for (const inv of autoGenNotice) {
-      await addItem('income', inv);
+    try {
+      for (const inv of autoGenNotice) {
+        await addItem('income', inv);
+      }
+      setAutoGenNotice(null);
+    } catch (err) {
+      console.error('Error auto-generating invoices:', err);
     }
-    setAutoGenNotice(null);
   };
 
   const dismissAutoGen = () => setAutoGenNotice(null);
@@ -89,12 +93,16 @@ export default function Income() {
   const confirmGenerate = async () => {
     const toCreate = generatedInvoices.filter(inv => selectedGeneratedIds.includes(inv.id));
     if (toCreate.length === 0) return;
-    for (const inv of toCreate) {
-      await addItem('income', inv);
+    try {
+      for (const inv of toCreate) {
+        await addItem('income', inv);
+      }
+      setGeneratedInvoices([]);
+      setSelectedGeneratedIds([]);
+      setModal(null);
+    } catch (err) {
+      console.error('Error confirming invoice generation:', err);
     }
-    setGeneratedInvoices([]);
-    setSelectedGeneratedIds([]);
-    setModal(null);
   };
 
   const openAdd = () => {

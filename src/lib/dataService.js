@@ -33,7 +33,7 @@ const COLUMN_WHITELIST = {
   vehicles:           ['id', 'registration', 'make', 'model', 'year', 'capacity_tons', 'current_odometer', 'status', 'assigned_driver_id', 'tank_capacity_liters', 'created_at'],
   routes:             ['id', 'name', 'origin', 'destination', 'distance_km', 'estimated_fuel_liters', 'estimated_tolls', 'estimated_duration_hours', 'notes', 'created_at'],
   trips:              ['id', 'route_id', 'vehicle_id', 'driver_id', 'client_id', 'origin', 'destination', 'cargo_type', 'cargo_weight_tons', 'departure_date', 'arrival_date', 'estimated_distance_km', 'actual_distance_km', 'status', 'notes', 'created_at', 'updated_at'],
-  income:             ['id', 'trip_id', 'client_id', 'invoice_number', 'invoice_month', 'amount', 'amount_paid', 'payment_status', 'payment_date', 'due_date', 'notes', 'generated_at', 'trip_details', 'created_at'],
+  income:             ['id', 'trip_id', 'client_id', 'invoice_number', 'invoice_month', 'amount', 'freight_amount', 'redeemable_amount', 'amount_paid', 'payment_status', 'payment_date', 'due_date', 'notes', 'generated_at', 'trip_details', 'redeemable_details', 'created_at'],
   expense_categories: ['id', 'name', 'default_redeemable', 'icon'],
   expenses:           ['id', 'trip_id', 'vehicle_id', 'driver_id', 'category_id', 'amount', 'is_redeemable', 'is_redeemed', 'expense_date', 'receipt_url', 'submitted_by', 'notes', 'approval_status', 'approved_by', 'created_at'],
   fuel_records:       ['id', 'vehicle_id', 'trip_id', 'recorded_by', 'liters', 'cost', 'odometer_reading', 'station', 'date', 'created_at'],
@@ -109,8 +109,9 @@ export async function getById(collection, id) {
 }
 
 const CORE_INCOME_COLUMNS = new Set([
-  'id', 'trip_id', 'client_id', 'invoice_number', 'amount', 'amount_paid',
-  'payment_status', 'payment_date', 'due_date', 'notes', 'created_at'
+  'id', 'trip_id', 'client_id', 'invoice_number', 'invoice_month', 'amount', 'amount_paid',
+  'payment_status', 'payment_date', 'due_date', 'notes', 'generated_at', 'trip_details',
+  'freight_amount', 'redeemable_amount', 'redeemable_details', 'created_at'
 ]);
 
 function getCoreClean(table, clean) {
