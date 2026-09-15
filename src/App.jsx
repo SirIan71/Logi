@@ -11,6 +11,7 @@ import { Analytics } from '@vercel/analytics/react';
 // Lazy-load route pages for bundle splitting
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Trips = lazy(() => import('./pages/Trips'));
+const LiveTracking = lazy(() => import('./pages/LiveTracking'));
 const RoutesPage = lazy(() => import('./pages/Routes'));
 const Fleet = lazy(() => import('./pages/Fleet'));
 const Maintenance = lazy(() => import('./pages/Maintenance'));
@@ -57,6 +58,7 @@ function AppRoutes() {
             {/* Dashboard is always accessible (driver gets personal view) */}
             <Route path="/" element={<Dashboard />} />
 
+            <Route path="/tracking" element={<ProtectedRoute page="tracking"><LiveTracking /></ProtectedRoute>} />
             <Route path="/trips" element={<ProtectedRoute page="trips"><Trips /></ProtectedRoute>} />
             <Route path="/routes" element={<ProtectedRoute page="routes"><RoutesPage /></ProtectedRoute>} />
             <Route path="/fleet" element={<ProtectedRoute page="fleet"><Fleet /></ProtectedRoute>} />

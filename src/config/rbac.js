@@ -15,6 +15,7 @@
 export const ROLE_PERMISSIONS = {
   admin: {
     dashboard:   'full',
+    tracking:    'full',
     trips:       'full',
     routes:      'full',
     fleet:       'full',
@@ -30,6 +31,7 @@ export const ROLE_PERMISSIONS = {
   },
   finance: {
     dashboard:   'full',
+    tracking:    'full',
     trips:       'read',
     routes:      'none',
     fleet:       'none',
@@ -45,6 +47,7 @@ export const ROLE_PERMISSIONS = {
   },
   operations: {
     dashboard:   'full',
+    tracking:    'full',
     trips:       'full',
     routes:      'full',
     fleet:       'full',
@@ -60,6 +63,7 @@ export const ROLE_PERMISSIONS = {
   },
   driver: {
     dashboard:   'own',  // personal dashboard
+    tracking:    'own',  // personal live trip tracking
     trips:       'own',  // own trips only
     routes:      'own',  // own routes only
     fleet:       'none',
@@ -101,6 +105,7 @@ const ALL_NAV_ITEMS = [
   // Overview
   { path: '/', label: 'Dashboard', icon: 'dashboard', group: 'Overview', page: 'dashboard' },
   // Operations
+  { path: '/tracking', label: 'Live Tracking', icon: 'radar', group: 'Operations', page: 'tracking' },
   { path: '/clients', label: 'Clients', icon: 'group', group: 'Operations', page: 'clients' },
   { path: '/routes', label: 'Routes', icon: 'map', group: 'Operations', page: 'routes' },
   { path: '/trips', label: 'Trips', icon: 'route', group: 'Operations', page: 'trips' },
